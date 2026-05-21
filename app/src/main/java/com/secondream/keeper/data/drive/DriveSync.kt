@@ -78,7 +78,7 @@ class DriveSync(private val context: Context) {
             if (created != null) Result.Success(created)
             else Result.Error("Impossibile creare la cartella Keeper su Drive")
         } catch (e: UserRecoverableAuthException) {
-            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
         } catch (e: Exception) {
             Result.Error("Errore connessione Drive: ${e.message}", e)
         }
@@ -110,7 +110,7 @@ class DriveSync(private val context: Context) {
             if (created != null) Result.Success(created)
             else Result.Error("Impossibile creare cartella della nota su Drive")
         } catch (e: UserRecoverableAuthException) {
-            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
         } catch (e: Exception) {
             Result.Error("Errore Drive: ${e.message}", e)
         }
@@ -145,7 +145,7 @@ class DriveSync(private val context: Context) {
                 else Result.Error("Impossibile creare $fileName su Drive")
             }
         } catch (e: UserRecoverableAuthException) {
-            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
         } catch (e: Exception) {
             Result.Error("Errore upload note.json: ${e.message}", e)
         }
@@ -174,7 +174,7 @@ class DriveSync(private val context: Context) {
             if (id != null) Result.Success(id)
             else Result.Error("Upload fallito per $targetFileName")
         } catch (e: UserRecoverableAuthException) {
-            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
         } catch (e: Exception) {
             Result.Error("Errore upload allegato: ${e.message}", e)
         }
@@ -196,7 +196,7 @@ class DriveSync(private val context: Context) {
                 else Result.Error("Errore eliminazione (HTTP ${resp.code})")
             }
         } catch (e: UserRecoverableAuthException) {
-            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
         } catch (e: Exception) {
             Result.Error("Errore eliminazione: ${e.message}", e)
         }
@@ -226,9 +226,58 @@ class DriveSync(private val context: Context) {
                 Result.Success(out)
             }
         } catch (e: UserRecoverableAuthException) {
-            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
         } catch (e: Exception) {
             Result.Error("Errore listing: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Download a Drive file's content as a String (for small text files like note.json).
+     */
+    suspend fun downloadFileAsString(accountName: String, fileId: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val accessToken = token(accountName)
+            val request = Request.Builder()
+                .url("$API_BASE/files/$fileId?alt=media")
+                .get()
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            client.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext Result.Error("Download fallito: HTTP ${resp.code}")
+                val body = resp.body?.string().orEmpty()
+                Result.Success(body)
+            }
+        } catch (e: UserRecoverableAuthException) {
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
+        } catch (e: Exception) {
+            Result.Error("Errore download stringa: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Download a Drive file's binary content to a local File on disk (for attachments).
+     */
+    suspend fun downloadFileToLocal(accountName: String, fileId: String, destination: File): Result<File> = withContext(Dispatchers.IO) {
+        try {
+            val accessToken = token(accountName)
+            val request = Request.Builder()
+                .url("$API_BASE/files/$fileId?alt=media")
+                .get()
+                .addHeader("Authorization", "Bearer $accessToken")
+                .build()
+            client.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext Result.Error("Download fallito: HTTP ${resp.code}")
+                val sink = destination.outputStream()
+                sink.use { out ->
+                    resp.body?.byteStream()?.copyTo(out)
+                }
+                Result.Success(destination)
+            }
+        } catch (e: UserRecoverableAuthException) {
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Autorizzazione necessaria senza intent recuperabile")
+        } catch (e: Exception) {
+            Result.Error("Errore download file: ${e.message}", e)
         }
     }
 

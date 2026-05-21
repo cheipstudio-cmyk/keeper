@@ -12,34 +12,50 @@ import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.ui.graphics.Color
 
+// Keeper palette: Pixel-style dark with Keep-yellow accent.
 private val DarkColorScheme =
   darkColorScheme(
-    primary = Color(0xFFF8F9FF),
+    primary = Color(0xFFFFCA28),                  // warm Keep yellow for accents
+    onPrimary = Color(0xFF1F1F1F),
+    primaryContainer = Color(0xFFFFCA28),          // FAB: bright yellow, clearly visible on dark
+    onPrimaryContainer = Color(0xFF1F1F1F),
     secondary = Color(0xFFCBD5E1),
-    tertiary = Color(0xFFA8C7FA),
-    background = Color(0xFF0F172A),
-    surface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFF1E293B),
-    onSurfaceVariant = Color(0xFF94A3B8),
+    onSecondary = Color(0xFF1F1F1F),
+    tertiary = Color(0xFF7DD3FC),                  // soft cyan accent
+    onTertiary = Color(0xFF0F172A),
+    background = Color(0xFF0B0F19),                // very dark navy
     onBackground = Color(0xFFF1F5F9),
+    surface = Color(0xFF0B0F19),
     onSurface = Color(0xFFF1F5F9),
-    primaryContainer = Color(0xFF1E293B),
-    onPrimaryContainer = Color(0xFFF1F5F9)
+    surfaceVariant = Color(0xFF1F2733),            // raised cards & bottom bar
+    onSurfaceVariant = Color(0xFFA0AEC0),
+    outline = Color(0xFF334155),
+    outlineVariant = Color(0xFF1F2733),
+    error = Color(0xFFFF6B6B),
+    onError = Color(0xFF1F1F1F)
   )
 
+// Light: warm white with Keep yellow accent — Pixel-style airy spacing
 private val LightColorScheme =
   lightColorScheme(
-    primary = Color(0xFF0F172A),
-    secondary = Color(0xFF475569),
-    tertiary = Color(0xFF062E6F),
-    background = Color(0xFFF8F9FF),
-    surface = Color(0xFFF8F9FF),
-    surfaceVariant = Color(0xFFE7E8F2),
-    onSurfaceVariant = Color(0xFF475569),
-    onBackground = Color(0xFF0F172A),
-    onSurface = Color(0xFF0F172A),
-    primaryContainer = Color(0xFFD3E3FD),
-    onPrimaryContainer = Color(0xFF041E49)
+    primary = Color(0xFF1A1A1A),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFE082),          // FAB: warm soft yellow
+    onPrimaryContainer = Color(0xFF1A1A1A),
+    secondary = Color(0xFF5F6368),
+    onSecondary = Color(0xFFFFFFFF),
+    tertiary = Color(0xFF1976D2),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFFFAFAFA),                // soft off-white
+    onBackground = Color(0xFF1A1A1A),
+    surface = Color(0xFFFFFFFF),                   // clean white cards
+    onSurface = Color(0xFF1A1A1A),
+    surfaceVariant = Color(0xFFF1F3F4),
+    onSurfaceVariant = Color(0xFF5F6368),
+    outline = Color(0xFFDADCE0),
+    outlineVariant = Color(0xFFE8EAED),
+    error = Color(0xFFD93025),
+    onError = Color(0xFFFFFFFF)
   )
 
 @Composable

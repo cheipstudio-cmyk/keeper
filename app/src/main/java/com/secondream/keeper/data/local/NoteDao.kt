@@ -44,6 +44,9 @@ interface NoteDao {
     @Query("UPDATE notes SET driveFolderId = :folderId, driveSyncedAt = :syncedAt WHERE id = :noteId")
     suspend fun updateDriveFolder(noteId: Long, folderId: String?, syncedAt: Long)
 
+    @Query("SELECT * FROM notes WHERE driveFolderId = :folderId LIMIT 1")
+    suspend fun getNoteByDriveFolderId(folderId: String): Note?
+
     @Query("SELECT * FROM notes WHERE isTrashed = 1")
     suspend fun getTrashedNotesSync(): List<Note>
 

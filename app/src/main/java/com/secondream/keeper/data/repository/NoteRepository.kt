@@ -61,6 +61,8 @@ class NoteRepository(private val noteDao: NoteDao) {
         noteDao.updateDriveFolder(noteId, folderId, syncedAt)
     }
 
+    suspend fun getNoteByDriveFolderId(folderId: String): Note? = noteDao.getNoteByDriveFolderId(folderId)
+
     suspend fun getTrashedNotesSync(): List<Note> = noteDao.getTrashedNotesSync()
 
     suspend fun getAllNotesSync(): List<Note> = noteDao.getAllNotesSync()

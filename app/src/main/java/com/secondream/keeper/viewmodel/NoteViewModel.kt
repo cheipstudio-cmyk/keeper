@@ -257,7 +257,47 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                         .apply()
                     _syncMessage.value = "Connesso. Cartella Keeper pronta su Drive."
 
-                    // If auto-upload was already on, immediately sync everything
+                    // Auto-import existing notes from Drive (covers the case
+                    // when user cleared app data and re-logs in)
+                    _syncMessage.value = "Cerco note esistenti su Drive..."
+                    val importOutcome = driveRepo.importNotesFromDrive(
+                        accountName = email,
+                        rootFolderId = result.folderId
+                    )
+                    if (importOutcome is DriveSyncRepository.ImportOutcome.Success) {
+                        var importedCount = 0
+                        for (imp in importOutcome.notes) {
+                            val existing = repository.getNoteByDriveFolderId(imp.driveFolderId)
+                            if (existing == null) {
+                                val newNote = Note(
+                                    title = imp.title,
+                                    content = imp.content,
+                                    colorHex = imp.colorHex,
+                                    isPinned = imp.isPinned,
+                                    isArchived = imp.isArchived,
+                                    isTrashed = imp.isTrashed,
+                                    createdAt = imp.createdAt,
+                                    updatedAt = imp.updatedAt,
+                                    labels = imp.labels,
+                                    checklistJson = imp.checklistJson,
+                                    attachmentsJson = imp.attachmentsJson,
+                                    driveFolderId = imp.driveFolderId,
+                                    driveSyncedAt = System.currentTimeMillis()
+                                )
+                                repository.insertNote(newNote)
+                                importedCount++
+                            }
+                        }
+                        if (importedCount > 0) {
+                            _syncMessage.value = "Recuperate $importedCount note da Drive"
+                        } else {
+                            _syncMessage.value = "Connesso. Nessuna nota su Drive."
+                        }
+                    } else if (importOutcome is DriveSyncRepository.ImportOutcome.NeedsUserAction) {
+                        _pendingAuthIntent.value = importOutcome.intent
+                    }
+
+                    // If auto-upload was already on, also push local notes
                     if (_autoUploadEnabled.value) {
                         syncAllNotesToDriveBlocking(email, result.folderId)
                     }
@@ -277,12 +317,13 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Manual sync: foreground operation, with progress callback.
-     * Iterates ALL notes (active + archived + trashed) and uploads each one.
+     * Manual sync: BIDIRECTIONAL.
+     * Step 1: Download from Drive all notes that are not yet in the local DB
+     * Step 2: Upload all local notes to Drive
      */
     fun syncNotesToCloud(email: String, onProgress: (Float, String) -> Unit, onComplete: () -> Unit) {
         viewModelScope.launch {
-            onProgress(0.05f, "Connessione a Drive...")
+            onProgress(0.02f, "Connessione a Drive...")
             val rootId = ensureRootFolderCached(email)
             if (rootId == null) {
                 onProgress(0.0f, "Impossibile accedere a Google Drive")
@@ -290,10 +331,80 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                 onComplete()
                 return@launch
             }
+
+            // ─── STEP 1: download from Drive ───
+            onProgress(0.05f, "Cerco note su Drive...")
+            val importOutcome = driveRepo.importNotesFromDrive(
+                accountName = email,
+                rootFolderId = rootId,
+                onProgress = { current, total, label ->
+                    val pct = 0.05f + (current.toFloat() / total.coerceAtLeast(1)) * 0.45f
+                    onProgress(pct, label)
+                }
+            )
+            var importedCount = 0
+            when (importOutcome) {
+                is DriveSyncRepository.ImportOutcome.Success -> {
+                    for (imp in importOutcome.notes) {
+                        // Skip if already in local DB
+                        val existing = repository.getNoteByDriveFolderId(imp.driveFolderId)
+                        if (existing == null) {
+                            val newNote = Note(
+                                title = imp.title,
+                                content = imp.content,
+                                colorHex = imp.colorHex,
+                                isPinned = imp.isPinned,
+                                isArchived = imp.isArchived,
+                                isTrashed = imp.isTrashed,
+                                createdAt = imp.createdAt,
+                                updatedAt = imp.updatedAt,
+                                labels = imp.labels,
+                                checklistJson = imp.checklistJson,
+                                attachmentsJson = imp.attachmentsJson,
+                                driveFolderId = imp.driveFolderId,
+                                driveSyncedAt = System.currentTimeMillis()
+                            )
+                            repository.insertNote(newNote)
+                            importedCount++
+                        } else if (imp.updatedAt > existing.updatedAt) {
+                            // Drive has newer version — overwrite local
+                            repository.updateNote(
+                                existing.copy(
+                                    title = imp.title,
+                                    content = imp.content,
+                                    colorHex = imp.colorHex,
+                                    isPinned = imp.isPinned,
+                                    isArchived = imp.isArchived,
+                                    isTrashed = imp.isTrashed,
+                                    labels = imp.labels,
+                                    updatedAt = imp.updatedAt,
+                                    checklistJson = imp.checklistJson,
+                                    attachmentsJson = imp.attachmentsJson,
+                                    driveSyncedAt = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    }
+                }
+                is DriveSyncRepository.ImportOutcome.NeedsUserAction -> {
+                    _pendingAuthIntent.value = importOutcome.intent
+                    onProgress(0.0f, "Serve consenso utente per Drive")
+                    delay(1500)
+                    onComplete()
+                    return@launch
+                }
+                is DriveSyncRepository.ImportOutcome.Failure -> {
+                    android.util.Log.w("DriveSync", "Import fallito: ${importOutcome.message}")
+                    onProgress(0.50f, "Errore download: ${importOutcome.message}")
+                    delay(800)
+                }
+            }
+
+            // ─── STEP 2: upload local notes ───
             val all = repository.getAllNotesSync()
             if (all.isEmpty()) {
-                onProgress(1.0f, "Nessuna nota da sincronizzare")
-                delay(700)
+                onProgress(1.0f, if (importedCount > 0) "Importate $importedCount note da Drive" else "Nessuna nota presente")
+                delay(900)
                 onComplete()
                 return@launch
             }
@@ -301,10 +412,9 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             var failures = 0
             for (note in all) {
                 index++
-                val pct = 0.05f + (index.toFloat() / all.size) * 0.9f
-                onProgress(pct, "Sincronizzo ${index}/${all.size}: ${note.title.take(20).ifBlank { "senza titolo" }}")
-                val outcome = driveRepo.uploadNote(email, note, rootId)
-                when (outcome) {
+                val pct = 0.50f + (index.toFloat() / all.size) * 0.48f
+                onProgress(pct, "Carico ${index}/${all.size}: ${note.title.take(20).ifBlank { "senza titolo" }}")
+                when (val outcome = driveRepo.uploadNote(email, note, rootId)) {
                     is DriveSyncRepository.SyncOutcome.Success -> {
                         repository.updateDriveFolder(note.id, outcome.folderId, System.currentTimeMillis())
                     }
@@ -321,10 +431,12 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             }
-            val msg = if (failures == 0) "Backup completato (${all.size} note)"
-                      else "Backup parziale: ${all.size - failures} ok, $failures errori"
+            val msg = buildString {
+                if (importedCount > 0) append("$importedCount scaricate da Drive. ")
+                append(if (failures == 0) "${all.size} caricate" else "${all.size - failures} ok, $failures errori")
+            }
             onProgress(1.0f, msg)
-            delay(900)
+            delay(1100)
             onComplete()
         }
     }

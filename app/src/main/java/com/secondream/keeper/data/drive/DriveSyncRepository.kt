@@ -119,6 +119,156 @@ class DriveSyncRepository(
         }
     }
 
+    /**
+     * Represents one note imported from Drive, with the binary attachments
+     * already saved to local cache. Caller inserts/updates in local DB.
+     */
+    data class ImportedNote(
+        val driveFolderId: String,
+        val title: String,
+        val content: String,
+        val colorHex: String,
+        val isPinned: Boolean,
+        val isArchived: Boolean,
+        val isTrashed: Boolean,
+        val labels: String,
+        val createdAt: Long,
+        val updatedAt: Long,
+        val checklistJson: String,
+        val attachmentsJson: String
+    )
+
+    sealed class ImportOutcome {
+        data class Success(val notes: List<ImportedNote>) : ImportOutcome()
+        data class NeedsUserAction(val intent: android.content.Intent) : ImportOutcome()
+        data class Failure(val message: String) : ImportOutcome()
+    }
+
+    /**
+     * Import every note found under the Keeper root folder on Drive.
+     * For each `note_*` subfolder:
+     *  - Downloads `note.json` and parses metadata
+     *  - Downloads each attachment binary to local cache
+     *  - Returns the full set as ImportedNote objects (caller inserts into DB)
+     */
+    suspend fun importNotesFromDrive(
+        accountName: String,
+        rootFolderId: String,
+        onProgress: (current: Int, total: Int, label: String) -> Unit = { _, _, _ -> }
+    ): ImportOutcome {
+        // 1. List all subfolders of root
+        val rootList = when (val r = drive.listFolderContents(accountName, rootFolderId)) {
+            is DriveSync.Result.Success -> r.value
+            is DriveSync.Result.NeedsUserAction -> return ImportOutcome.NeedsUserAction(r.intent)
+            is DriveSync.Result.Error -> return ImportOutcome.Failure(r.message)
+        }
+        val noteFolders = rootList.filter { it.mimeType == DriveSync.FOLDER_MIME && it.name.startsWith("note_") }
+        if (noteFolders.isEmpty()) return ImportOutcome.Success(emptyList())
+
+        val cacheDir = File(context.cacheDir, "drive_attachments").apply { mkdirs() }
+        val imported = mutableListOf<ImportedNote>()
+
+        noteFolders.forEachIndexed { index, folder ->
+            onProgress(index + 1, noteFolders.size, "Importo: ${folder.name}")
+
+            // 2. List the folder's contents
+            val folderContents = when (val r = drive.listFolderContents(accountName, folder.id)) {
+                is DriveSync.Result.Success -> r.value
+                is DriveSync.Result.NeedsUserAction -> return ImportOutcome.NeedsUserAction(r.intent)
+                is DriveSync.Result.Error -> {
+                    android.util.Log.w("DriveSync", "Skip folder ${folder.name}: ${r.message}")
+                    return@forEachIndexed
+                }
+            }
+
+            // 3. Find note.json and download it
+            val noteJsonEntry = folderContents.firstOrNull { it.name == DriveSync.NOTE_JSON_NAME }
+            if (noteJsonEntry == null) {
+                android.util.Log.w("DriveSync", "Skip folder ${folder.name}: no note.json")
+                return@forEachIndexed
+            }
+            val noteJsonText = when (val r = drive.downloadFileAsString(accountName, noteJsonEntry.id)) {
+                is DriveSync.Result.Success -> r.value
+                is DriveSync.Result.NeedsUserAction -> return ImportOutcome.NeedsUserAction(r.intent)
+                is DriveSync.Result.Error -> {
+                    android.util.Log.w("DriveSync", "Skip ${folder.name}: cannot download note.json (${r.message})")
+                    return@forEachIndexed
+                }
+            }
+
+            // 4. Parse note.json
+            val parsed = try {
+                JSONObject(noteJsonText)
+            } catch (e: Exception) {
+                android.util.Log.w("DriveSync", "Skip ${folder.name}: invalid note.json")
+                return@forEachIndexed
+            }
+
+            // 5. Download each attachment binary
+            val attachmentsArr = parsed.optJSONArray("attachments") ?: JSONArray()
+            val newAttachmentsArr = JSONArray()
+            for (i in 0 until attachmentsArr.length()) {
+                val attObj = attachmentsArr.getJSONObject(i)
+                val attId = attObj.optString("id")
+                val attType = attObj.optString("type")
+                val originalName = attObj.optString("originalName")
+                val driveFileName = attObj.optString("driveFileName")
+                val sizeLabel = attObj.optString("size", "")
+
+                // Find the corresponding file on Drive by name
+                val driveAttEntry = folderContents.firstOrNull { it.name == driveFileName }
+                if (driveAttEntry == null) {
+                    android.util.Log.w("DriveSync", "Allegato non trovato: $driveFileName")
+                    continue
+                }
+
+                val localFile = File(cacheDir, "${folder.id}_$driveFileName")
+                if (!localFile.exists()) {
+                    val r = drive.downloadFileToLocal(accountName, driveAttEntry.id, localFile)
+                    when (r) {
+                        is DriveSync.Result.Success -> { /* ok */ }
+                        is DriveSync.Result.NeedsUserAction -> return ImportOutcome.NeedsUserAction(r.intent)
+                        is DriveSync.Result.Error -> {
+                            android.util.Log.w("DriveSync", "Skip allegato $driveFileName: ${r.message}")
+                            continue
+                        }
+                    }
+                }
+
+                val newAtt = JSONObject().apply {
+                    put("id", attId)
+                    put("type", attType)
+                    put("uri", "file://${localFile.absolutePath}")
+                    put("name", originalName)
+                    put("size", sizeLabel)
+                }
+                newAttachmentsArr.put(newAtt)
+            }
+
+            // 6. Build ImportedNote
+            val checklistArr = parsed.optJSONArray("checklist") ?: JSONArray()
+            val checklistJson = checklistArr.toString()
+            imported.add(
+                ImportedNote(
+                    driveFolderId = folder.id,
+                    title = parsed.optString("title", ""),
+                    content = parsed.optString("content", ""),
+                    colorHex = parsed.optString("colorHex", "#FFFFFF"),
+                    isPinned = parsed.optBoolean("isPinned", false),
+                    isArchived = parsed.optBoolean("isArchived", false),
+                    isTrashed = parsed.optBoolean("isTrashed", false),
+                    labels = parsed.optString("labels", ""),
+                    createdAt = parsed.optLong("createdAt", System.currentTimeMillis()),
+                    updatedAt = parsed.optLong("updatedAt", System.currentTimeMillis()),
+                    checklistJson = if (checklistArr.length() > 0) checklistJson else "",
+                    attachmentsJson = if (newAttachmentsArr.length() > 0) newAttachmentsArr.toString() else ""
+                )
+            )
+        }
+
+        return ImportOutcome.Success(imported)
+    }
+
     // ─────────────────────────────────────── helpers ───────────────────────────────────────
 
     private fun buildNoteJson(note: Note, attachments: List<Attachment>): String {
