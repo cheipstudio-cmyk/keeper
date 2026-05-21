@@ -434,13 +434,35 @@ fun NoteDetailView(
                             )
                         }
 
-                        // Archive direct button (for existing notes)
+                        // Share note (text + attachments)
+                        IconButton(onClick = {
+                            val paths = allAttachments
+                                .map { it.uri }
+                                .filter { it.startsWith("file://") || it.startsWith("/") }
+                            com.secondream.keeper.util.FileOpener.shareNote(
+                                context = context,
+                                title = title,
+                                content = content,
+                                attachmentPaths = paths
+                            )
+                        }) {
+                            Icon(Icons.Filled.Share, stringResource(R.string.share_note))
+                        }
+
+                        // Archive / Unarchive toggle (for existing notes)
                         if (note != null) {
                             IconButton(onClick = {
-                                viewModel.archiveNote(note.id)
+                                if (note.isArchived) viewModel.unarchiveNote(note.id)
+                                else viewModel.archiveNote(note.id)
                                 onDismiss()
                             }) {
-                                Icon(Icons.Outlined.Archive, stringResource(R.string.archive_tooltip))
+                                Icon(
+                                    imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                                    contentDescription = if (note.isArchived)
+                                        stringResource(R.string.unarchive_note)
+                                    else
+                                        stringResource(R.string.archive_tooltip)
+                                )
                             }
                         }
                     }
@@ -1328,12 +1350,25 @@ fun NoteDetailView(
             }
         }
 
-    // Attachment Full-Screen media playing modal
+    // Attachment Full-Screen media playing modal — for image/video/audio only.
+    // For file-type attachments (PDF, ZIP, doc, etc.) launch the system intent
+    // so the user picks their preferred external app.
     activeViewerAttachment?.let { attachment ->
-        MediaViewerDialog(
-            attachment = attachment,
-            onDismiss = { activeViewerAttachment = null }
-        )
+        if (attachment.type == "file") {
+            LaunchedEffect(attachment.id) {
+                com.secondream.keeper.util.FileOpener.openFile(
+                    context = context,
+                    filePath = attachment.uri,
+                    displayName = attachment.name
+                )
+                activeViewerAttachment = null
+            }
+        } else {
+            MediaViewerDialog(
+                attachment = attachment,
+                onDismiss = { activeViewerAttachment = null }
+            )
+        }
     }
 }
 

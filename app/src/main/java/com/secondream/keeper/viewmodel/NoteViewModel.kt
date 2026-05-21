@@ -197,6 +197,15 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingAuthIntent = MutableStateFlow<Intent?>(null)
     val pendingAuthIntent = _pendingAuthIntent.asStateFlow()
 
+    // Onboarding: shown only on first launch (until user dismisses or connects)
+    private val _onboardingCompleted = MutableStateFlow(prefs.getBoolean("onboarding_completed", false))
+    val onboardingCompleted = _onboardingCompleted.asStateFlow()
+
+    fun completeOnboarding() {
+        _onboardingCompleted.value = true
+        prefs.edit().putBoolean("onboarding_completed", true).apply()
+    }
+
     // Drive sync repository
     private val driveRepo: DriveSyncRepository = DriveSyncRepository(application.applicationContext)
 
@@ -255,6 +264,8 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                         .putBoolean("google_connected", true)
                         .putString("google_email", email)
                         .apply()
+                    // First successful login completes onboarding
+                    completeOnboarding()
                     _syncMessage.value = "Connesso. Cartella Keeper pronta su Drive."
 
                     // Auto-import existing notes from Drive (covers the case

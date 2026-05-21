@@ -96,4 +96,29 @@
     <string name="delete_confirm_msg_permanent">Are you sure you want to delete this note permanently? This action cannot be undone.</string>
     <string name="delete_confirm_delete">Delete</string>
     <string name="delete_confirm_cancel">Cancel</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Welcome to Keeper</string>
+    <string name="onboarding_welcome_subtitle">Your private notebook, backed up to your own Google Drive.</string>
+    <string name="onboarding_feature_backup_title">Automatic backup</string>
+    <string name="onboarding_feature_backup_body">Every note and attachment is saved to your Google Drive in real time.</string>
+    <string name="onboarding_feature_private_title">Only yours</string>
+    <string name="onboarding_feature_private_body">Keeper uses a private app folder. Nobody else can see your notes.</string>
+    <string name="onboarding_feature_restore_title">Restore from any device</string>
+    <string name="onboarding_feature_restore_body">Reinstall the app and log in: your notes come back with their photos and videos.</string>
+    <string name="onboarding_connect_drive">Connect Google Drive</string>
+    <string name="onboarding_skip">Skip for now</string>
+
+    <!-- Donation &amp; About -->
+    <string name="about_title">About Keeper</string>
+    <string name="about_version">Version</string>
+    <string name="about_author">Made by Second Dream</string>
+    <string name="support_title">Enjoying Keeper?</string>
+    <string name="support_body">Keeper is free and ad-free. If you want to support the project, buy me a coffee.</string>
+    <string name="support_button">Buy me a coffee</string>
+
+    <!-- Share &amp; misc -->
+    <string name="share_note">Share note</string>
+    <string name="open_with">Open with</string>
+    <string name="unarchive_note">Move back to notes</string>
 </resources>

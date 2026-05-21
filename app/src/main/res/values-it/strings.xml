@@ -96,4 +96,29 @@
     <string name="delete_confirm_msg_permanent">Sei sicuro di voler eliminare definitivamente questa nota? Questa azione non può essere annullata.</string>
     <string name="delete_confirm_delete">Elimina</string>
     <string name="delete_confirm_cancel">Annulla</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Benvenuto in Keeper</string>
+    <string name="onboarding_welcome_subtitle">Il tuo block-notes privato, salvato sul tuo Google Drive.</string>
+    <string name="onboarding_feature_backup_title">Backup automatico</string>
+    <string name="onboarding_feature_backup_body">Ogni nota e allegato viene salvato su Google Drive in tempo reale.</string>
+    <string name="onboarding_feature_private_title">Solo tuo</string>
+    <string name="onboarding_feature_private_body">Keeper usa una cartella privata dell\'app. Nessun altro può vedere le tue note.</string>
+    <string name="onboarding_feature_restore_title">Ripristina da qualsiasi dispositivo</string>
+    <string name="onboarding_feature_restore_body">Reinstalla l\'app e accedi: le tue note tornano con foto e video.</string>
+    <string name="onboarding_connect_drive">Collega Google Drive</string>
+    <string name="onboarding_skip">Salta per ora</string>
+
+    <!-- Donation &amp; About -->
+    <string name="about_title">Informazioni su Keeper</string>
+    <string name="about_version">Versione</string>
+    <string name="about_author">Realizzato da Second Dream</string>
+    <string name="support_title">Ti piace Keeper?</string>
+    <string name="support_body">Keeper è gratuita e senza pubblicità. Se vuoi sostenere il progetto, offrimi un caffè.</string>
+    <string name="support_button">Offrimi un caffè</string>
+
+    <!-- Share &amp; misc -->
+    <string name="share_note">Condividi nota</string>
+    <string name="open_with">Apri con</string>
+    <string name="unarchive_note">Sposta nelle note</string>
 </resources>

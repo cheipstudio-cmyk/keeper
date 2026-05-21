@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.secondream.keeper.ui.screens.NoteApp
+import com.secondream.keeper.ui.screens.OnboardingDialog
 import com.secondream.keeper.ui.theme.MyApplicationTheme
 import com.secondream.keeper.viewmodel.NoteViewModel
 
@@ -37,11 +38,7 @@ class MainActivity : ComponentActivity() {
             val authLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.StartActivityForResult()
             ) { result ->
-                // After consent, retry the last sync; the user can hit the sync button or
-                // auto-upload will pick up changes on next note edit. We just clear the
-                // pending intent here.
                 viewModel.clearPendingAuthIntent()
-                // If account is set, ensure we record connection (consent granted implies success)
                 val email = viewModel.googleEmail.value
                 if (result.resultCode == android.app.Activity.RESULT_OK && email.isNotBlank()) {
                     viewModel.connectAndSyncGoogleAccount(email)
@@ -58,9 +55,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // First-launch onboarding
+            val onboardingCompleted by viewModel.onboardingCompleted.collectAsState()
+
             MyApplicationTheme(darkTheme = useDarkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     NoteApp(viewModel = viewModel)
+                    if (!onboardingCompleted) {
+                        OnboardingDialog(viewModel = viewModel)
+                    }
                 }
             }
         }
