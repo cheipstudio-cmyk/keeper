@@ -1,0 +1,124 @@
+<resources>
+    <string name="app_name">Keeper</string>
+    <string name="screen_notes">Notizen</string>
+    <string name="screen_reminders">Erinnerungen &amp; Listen</string>
+    <string name="screen_archive">Archiv</string>
+    <string name="screen_trash">Papierkorb</string>
+    <string name="screen_settings">Einstellungen</string>
+    <string name="dynamic_labels_header">DYNAMISCHE LABELS</string>
+
+    <string name="search_hint">Keep-Ideen durchsuchen…</string>
+    <string name="toggle_grid">Layout wechseln</string>
+    <string name="take_note">Notiz erstellen</string>
+    <string name="add_todo">Aufgabe hinzufügen</string>
+    <string name="add_image">Bild hinzufügen</string>
+    <string name="add_file">Datei hinzufügen</string>
+    <string name="pinned_ideas">ANGEHEFTET</string>
+    <string name="others">SONSTIGE</string>
+
+    <string name="pin_tooltip">Notiz anheften</string>
+    <string name="attachments_badge">%1$d Anhang</string>
+    <string name="attachments_badge_plural">%1$d Anhänge</string>
+    <string name="archive_tooltip">Notiz archivieren</string>
+    <string name="trash_tooltip">In Papierkorb verschieben</string>
+
+    <string name="empty_notes">Deine Notizen erscheinen hier</string>
+    <string name="empty_reminders">Keine offenen Aufgabenlisten</string>
+    <string name="empty_archive">Archivierte Notizen in Sicherheit</string>
+    <string name="empty_trash">Papierkorb ist leer</string>
+    <string name="empty_label">Keine Notizen mit diesem Label</string>
+    <string name="empty_settings">Keine Einstellungen</string>
+
+    <string name="new_note_title">Neue Notiz</string>
+    <string name="edit_note_title">Notiz bearbeiten</string>
+    <string name="title_placeholder">Titel</string>
+    <string name="content_placeholder">Notizinhalt…</string>
+    <string name="checklist_header">LISTENELEMENTE (%1$d)</string>
+    <string name="convert_to_text">In Text umwandeln</string>
+    <string name="checklist_placeholder">Beschreibung des Elements…</string>
+    <string name="add_tags_label">Tags (durch Komma getrennt, z. B. Arbeit,Privat)</string>
+    <string name="select_bg_color">HINTERGRUNDFARBE WÄHLEN</string>
+    <string name="palette_tooltip">Palette</string>
+    <string name="tags_tooltip">Tags hinzufügen</string>
+    <string name="checklist_tooltip">Liste beginnen</string>
+    <string name="attach_file_tooltip">Dateien &amp; Bilder hinzufügen</string>
+    <string name="unsupported_format">Dateityp nicht unterstützt</string>
+
+    <string name="real_picker_image">Bild vom Gerät einfügen</string>
+    <string name="real_picker_video">Video vom Gerät einfügen</string>
+    <string name="real_picker_file">Datei/PDF vom Gerät einfügen</string>
+    <string name="simulated_image">Beispielbild (Strand)</string>
+    <string name="simulated_image2">Beispielbild (Monstera)</string>
+    <string name="simulated_video">Beispielvideo (waves.mp4)</string>
+    <string name="simulated_doc">Beispieldokument (itinerary.pdf)</string>
+
+    <string name="settings_hdr">Keeper-Einstellungen</string>
+    <string name="settings_sub">Passe deine Notizen und das Layout an</string>
+    <string name="app_theme_header">APP-THEMA</string>
+    <string name="theme_system">Systemstandard</string>
+    <string name="theme_light">Helles Thema</string>
+    <string name="theme_dark">Dunkles Thema</string>
+    <string name="default_note_color_header">STANDARDFARBE DER NOTIZEN</string>
+    <string name="explorer_profile_header">PROFIL</string>
+    <string name="primary_user">Hauptnutzer: %1$s</string>
+    <string name="simulated_backup_header">LOKALE SICHERUNG</string>
+    <string name="simulated_backup_sub">Sichere deine Notizen lokal als SQLite-Daten.</string>
+    <string name="running_backup_status">Notizen werden gesichert… %1$d%% fertig</string>
+    <string name="last_sync_label">Letzte Synchronisation: %1$s</string>
+    <string name="voice_recorder_title">Spracheingabe</string>
+    <string name="voice_recorder_desc">Sprich deutlich. Deine Stimme wird direkt in die Notiz transkribiert.</string>
+    <string name="voice_start">Aufnahme starten</string>
+    <string name="voice_stop">Diktat beenden</string>
+    <string name="drawer_greeting">Hallo, %1$s!</string>
+    <string name="drawer_sub">Mein digitales Keep</string>
+    <string name="back_and_save">Zurück und speichern</string>
+    <string name="sync_now">Jetzt synchronisieren</string>
+    <string name="sync_auto_active">Automatische Synchronisation aktiv</string>
+    <string name="never_backed_up">Noch nie gesichert</string>
+    <string name="just_now">Gerade eben</string>
+    <string name="more_checklist_items">+ %1$d weitere Elemente</string>
+    <string name="voice_placeholder">Sprich oder schreibe direkt hier…</string>
+    <string name="voice_transcribing">Transkription läuft…</string>
+
+    <string name="google_account_header">GOOGLE-KONTO</string>
+    <string name="google_backup_header">GOOGLE-BACKUP</string>
+    <string name="google_backup_sub">Synchronisiere und sichere deine Notizen und Anhänge sicher in Google Drive.</string>
+    <string name="connect_google_account">Google-Konto verbinden</string>
+    <string name="disconnect_google_account">Konto trennen</string>
+    <string name="google_account_connected">Verbunden als %1$s</string>
+    <string name="select_google_account">Konto für Backup wählen</string>
+    <string name="synchronizing_google_drive">Synchronisierung mit Google Drive… %1$d%%</string>
+
+    <string name="delete_confirm_title">Notiz löschen?</string>
+    <string name="delete_confirm_msg">Möchtest du diese Notiz wirklich in den Papierkorb verschieben? Notizen im Papierkorb können später wiederhergestellt werden.</string>
+    <string name="delete_confirm_title_permanent">Endgültig löschen?</string>
+    <string name="delete_confirm_msg_permanent">Möchtest du diese Notiz endgültig löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.</string>
+    <string name="delete_confirm_delete">Löschen</string>
+    <string name="delete_confirm_cancel">Abbrechen</string>
+
+    <string name="onboarding_welcome_title">Willkommen bei Keeper</string>
+    <string name="onboarding_welcome_subtitle">Dein privates Notizbuch, gesichert in deinem eigenen Google Drive.</string>
+    <string name="onboarding_intro_long">Keeper ist ein schnelles, privates Notizbuch für alles, was du dir merken willst. Schreibe Notizen, hänge Fotos, Videos und Dokumente an, erstelle Listen, nimm deine Stimme auf: alles bleibt in deinem eigenen Google Drive.</string>
+    <string name="onboarding_feature_backup_title">Automatisches Backup</string>
+    <string name="onboarding_feature_backup_body">Jede Notiz und jeder Anhang wird in Echtzeit auf deinem Drive gespeichert, ohne Zwischenserver.</string>
+    <string name="onboarding_feature_private_title">Nur für dich</string>
+    <string name="onboarding_feature_private_body">Keeper nutzt einen App-eigenen Ordner. Niemand außer dir sieht die Dateien, auch wir nicht.</string>
+    <string name="onboarding_feature_restore_title">Auf jedem Gerät wiederherstellbar</string>
+    <string name="onboarding_feature_restore_body">App neu installieren und anmelden: deine Notizen kehren mit ihren Fotos und Videos zurück.</string>
+    <string name="onboarding_feature_rich_title">Reiche Notizen</string>
+    <string name="onboarding_feature_rich_body">Text, Listen, Fotos, Videos, PDFs, ZIPs und Spracheingabe: alles passt in eine Notiz.</string>
+    <string name="onboarding_drive_explain">Wenn du auf Verbinden tippst, fragt Google einmalig nach Erlaubnis. Wir bitten nur um Zugriff auf die von Keeper erstellten Dateien.</string>
+    <string name="onboarding_connect_drive">Google Drive verbinden</string>
+    <string name="onboarding_skip">Vorerst überspringen (kein Backup)</string>
+
+    <string name="about_title">Über Keeper</string>
+    <string name="about_version">Version</string>
+    <string name="about_author">Von Second Dream</string>
+    <string name="support_title">Magst du Keeper?</string>
+    <string name="support_body">Keeper ist kostenlos und werbefrei. Wenn du das Projekt unterstützen willst, spendiere mir einen Kaffee.</string>
+    <string name="support_button">Spendiere mir einen Kaffee</string>
+
+    <string name="share_note">Notiz teilen</string>
+    <string name="open_with">Öffnen mit</string>
+    <string name="unarchive_note">Zurück zu Notizen</string>
+</resources>

@@ -1,0 +1,124 @@
+<resources>
+    <string name="app_name">Keeper</string>
+    <string name="screen_notes">Notas</string>
+    <string name="screen_reminders">Lembretes e listas</string>
+    <string name="screen_archive">Arquivo</string>
+    <string name="screen_trash">Lixeira</string>
+    <string name="screen_settings">Configurações</string>
+    <string name="dynamic_labels_header">ETIQUETAS DINÂMICAS</string>
+
+    <string name="search_hint">Pesquise suas ideias no Keep…</string>
+    <string name="toggle_grid">Alternar layout</string>
+    <string name="take_note">Criar nota</string>
+    <string name="add_todo">Adicionar tarefa</string>
+    <string name="add_image">Adicionar imagem</string>
+    <string name="add_file">Adicionar arquivo</string>
+    <string name="pinned_ideas">FIXADAS</string>
+    <string name="others">OUTRAS</string>
+
+    <string name="pin_tooltip">Fixar nota</string>
+    <string name="attachments_badge">%1$d anexo</string>
+    <string name="attachments_badge_plural">%1$d anexos</string>
+    <string name="archive_tooltip">Arquivar nota</string>
+    <string name="trash_tooltip">Mover para a lixeira</string>
+
+    <string name="empty_notes">Suas notas aparecerão aqui</string>
+    <string name="empty_reminders">Nenhuma lista com tarefas pendentes</string>
+    <string name="empty_archive">Notas arquivadas em segurança</string>
+    <string name="empty_trash">A lixeira está vazia</string>
+    <string name="empty_label">Nenhuma nota com esta etiqueta</string>
+    <string name="empty_settings">Sem opções</string>
+
+    <string name="new_note_title">Nova nota</string>
+    <string name="edit_note_title">Editar nota</string>
+    <string name="title_placeholder">Título</string>
+    <string name="content_placeholder">Detalhes da nota…</string>
+    <string name="checklist_header">ITENS DA LISTA (%1$d)</string>
+    <string name="convert_to_text">Converter em texto</string>
+    <string name="checklist_placeholder">Descrição do item…</string>
+    <string name="add_tags_label">Etiquetas (separadas por vírgula, p. ex. Trabalho,Pessoal)</string>
+    <string name="select_bg_color">SELECIONAR COR DE FUNDO</string>
+    <string name="palette_tooltip">Paleta</string>
+    <string name="tags_tooltip">Adicionar etiquetas</string>
+    <string name="checklist_tooltip">Iniciar lista</string>
+    <string name="attach_file_tooltip">Adicionar arquivos e imagens</string>
+    <string name="unsupported_format">Tipo de arquivo não suportado</string>
+
+    <string name="real_picker_image">Inserir imagem do dispositivo</string>
+    <string name="real_picker_video">Inserir vídeo do dispositivo</string>
+    <string name="real_picker_file">Inserir arquivo/PDF do dispositivo</string>
+    <string name="simulated_image">Imagem de exemplo (praia)</string>
+    <string name="simulated_image2">Imagem de exemplo (Monstera)</string>
+    <string name="simulated_video">Vídeo de exemplo (waves.mp4)</string>
+    <string name="simulated_doc">Documento de exemplo (itinerary.pdf)</string>
+
+    <string name="settings_hdr">Configurações do Keeper</string>
+    <string name="settings_sub">Personalize suas notas e o layout</string>
+    <string name="app_theme_header">TEMA DO APP</string>
+    <string name="theme_system">Tema do sistema</string>
+    <string name="theme_light">Tema claro</string>
+    <string name="theme_dark">Tema escuro</string>
+    <string name="default_note_color_header">COR PADRÃO DA NOTA</string>
+    <string name="explorer_profile_header">PERFIL</string>
+    <string name="primary_user">Usuário principal: %1$s</string>
+    <string name="simulated_backup_header">BACKUP LOCAL</string>
+    <string name="simulated_backup_sub">Faça backup local das suas notas em SQLite.</string>
+    <string name="running_backup_status">Fazendo backup das notas… %1$d%% concluído</string>
+    <string name="last_sync_label">Última sincronização: %1$s</string>
+    <string name="voice_recorder_title">Ditado por voz</string>
+    <string name="voice_recorder_desc">Fale com clareza. Sua voz será transcrita no conteúdo da nota.</string>
+    <string name="voice_start">Iniciar gravação</string>
+    <string name="voice_stop">Parar ditado</string>
+    <string name="drawer_greeting">Olá, %1$s!</string>
+    <string name="drawer_sub">Meu Keep digital</string>
+    <string name="back_and_save">Voltar e salvar</string>
+    <string name="sync_now">Sincronizar agora</string>
+    <string name="sync_auto_active">Sincronização automática ativa</string>
+    <string name="never_backed_up">Nunca sincronizado</string>
+    <string name="just_now">Agora mesmo</string>
+    <string name="more_checklist_items">+ %1$d itens a mais</string>
+    <string name="voice_placeholder">Fale ou digite diretamente aqui…</string>
+    <string name="voice_transcribing">Transcrição em andamento…</string>
+
+    <string name="google_account_header">CONTA GOOGLE</string>
+    <string name="google_backup_header">BACKUP NO GOOGLE</string>
+    <string name="google_backup_sub">Sincronize e faça backup das suas notas e anexos no Google Drive com segurança.</string>
+    <string name="connect_google_account">Conectar conta Google</string>
+    <string name="disconnect_google_account">Desconectar conta</string>
+    <string name="google_account_connected">Conectado como %1$s</string>
+    <string name="select_google_account">Selecione a conta para o backup</string>
+    <string name="synchronizing_google_drive">Sincronizando com Google Drive… %1$d%%</string>
+
+    <string name="delete_confirm_title">Excluir a nota?</string>
+    <string name="delete_confirm_msg">Tem certeza que quer mover esta nota para a lixeira? Notas na lixeira podem ser restauradas depois.</string>
+    <string name="delete_confirm_title_permanent">Excluir permanentemente?</string>
+    <string name="delete_confirm_msg_permanent">Tem certeza que quer excluir esta nota para sempre? Esta ação não pode ser desfeita.</string>
+    <string name="delete_confirm_delete">Excluir</string>
+    <string name="delete_confirm_cancel">Cancelar</string>
+
+    <string name="onboarding_welcome_title">Bem-vindo ao Keeper</string>
+    <string name="onboarding_welcome_subtitle">Seu caderno privado, com backup no seu próprio Google Drive.</string>
+    <string name="onboarding_intro_long">Keeper é um caderno rápido e privado para tudo o que você quer lembrar. Faça anotações, anexe fotos, vídeos e documentos, crie listas, grave sua voz: tudo fica no seu próprio Google Drive.</string>
+    <string name="onboarding_feature_backup_title">Backup automático</string>
+    <string name="onboarding_feature_backup_body">Cada nota e anexo é salvo no seu Drive em tempo real, sem servidores intermediários.</string>
+    <string name="onboarding_feature_private_title">Só seu</string>
+    <string name="onboarding_feature_private_body">Keeper usa uma pasta privada do app. Ninguém além de você vê os arquivos, nem nós.</string>
+    <string name="onboarding_feature_restore_title">Restaure em qualquer dispositivo</string>
+    <string name="onboarding_feature_restore_body">Reinstale o app e faça login: suas notas voltam com fotos e vídeos intactos.</string>
+    <string name="onboarding_feature_rich_title">Notas ricas</string>
+    <string name="onboarding_feature_rich_body">Texto, listas, fotos, vídeos, PDFs, ZIPs e ditado por voz: tudo cabe em uma nota.</string>
+    <string name="onboarding_drive_explain">Ao tocar em Conectar, o Google pedirá permissão uma vez. Pedimos acesso apenas aos arquivos criados pelo Keeper.</string>
+    <string name="onboarding_connect_drive">Conectar Google Drive</string>
+    <string name="onboarding_skip">Pular por enquanto (sem backup)</string>
+
+    <string name="about_title">Sobre o Keeper</string>
+    <string name="about_version">Versão</string>
+    <string name="about_author">Feito por Second Dream</string>
+    <string name="support_title">Está gostando do Keeper?</string>
+    <string name="support_body">Keeper é gratuito e sem anúncios. Se quiser apoiar o projeto, pague-me um café.</string>
+    <string name="support_button">Pague-me um café</string>
+
+    <string name="share_note">Compartilhar nota</string>
+    <string name="open_with">Abrir com</string>
+    <string name="unarchive_note">Voltar para notas</string>
+</resources>

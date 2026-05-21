@@ -480,7 +480,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                     }
                 }
             }
-                }   // close AnimatedContent screen lambda
+                // close AnimatedContent screen lambda
 
                 // Floating banners over the scaffold content
                 OfflineBanner(
