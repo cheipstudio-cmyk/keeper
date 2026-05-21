@@ -78,7 +78,7 @@ class DriveSync(private val context: Context) {
             if (created != null) Result.Success(created)
             else Result.Error("Impossibile creare la cartella Keeper su Drive")
         } catch (e: UserRecoverableAuthException) {
-            Result.NeedsUserAction(e.intent)
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
         } catch (e: Exception) {
             Result.Error("Errore connessione Drive: ${e.message}", e)
         }
@@ -110,7 +110,7 @@ class DriveSync(private val context: Context) {
             if (created != null) Result.Success(created)
             else Result.Error("Impossibile creare cartella della nota su Drive")
         } catch (e: UserRecoverableAuthException) {
-            Result.NeedsUserAction(e.intent)
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
         } catch (e: Exception) {
             Result.Error("Errore Drive: ${e.message}", e)
         }
@@ -145,7 +145,7 @@ class DriveSync(private val context: Context) {
                 else Result.Error("Impossibile creare $fileName su Drive")
             }
         } catch (e: UserRecoverableAuthException) {
-            Result.NeedsUserAction(e.intent)
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
         } catch (e: Exception) {
             Result.Error("Errore upload note.json: ${e.message}", e)
         }
@@ -174,7 +174,7 @@ class DriveSync(private val context: Context) {
             if (id != null) Result.Success(id)
             else Result.Error("Upload fallito per $targetFileName")
         } catch (e: UserRecoverableAuthException) {
-            Result.NeedsUserAction(e.intent)
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
         } catch (e: Exception) {
             Result.Error("Errore upload allegato: ${e.message}", e)
         }
@@ -196,7 +196,7 @@ class DriveSync(private val context: Context) {
                 else Result.Error("Errore eliminazione (HTTP ${resp.code})")
             }
         } catch (e: UserRecoverableAuthException) {
-            Result.NeedsUserAction(e.intent)
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
         } catch (e: Exception) {
             Result.Error("Errore eliminazione: ${e.message}", e)
         }
@@ -226,7 +226,7 @@ class DriveSync(private val context: Context) {
                 Result.Success(out)
             }
         } catch (e: UserRecoverableAuthException) {
-            Result.NeedsUserAction(e.intent)
+            e.intent?.let { Result.NeedsUserAction(it) } ?: Result.Error("Auth necessaria")
         } catch (e: Exception) {
             Result.Error("Errore listing: ${e.message}", e)
         }
