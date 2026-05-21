@@ -17,6 +17,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 sealed interface NavigationScreen {
@@ -170,7 +172,10 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setUserName(name: String) {
         _userName.value = name
-        prefs.edit().putString("user_name", name).apply()
+        prefs.edit()
+            .putString("user_name", name)
+            .putBoolean("user_name_manual", true)
+            .apply()
     }
 
     /**
@@ -185,6 +190,22 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             .map { it.trim() }
             .filter { it.isNotBlank() }
         return parts.joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+    }
+
+    /**
+     * Update the displayed username from an email — but ONLY if the user
+     * never set it manually. This way switching accounts updates the name,
+     * but a manually-typed name is preserved.
+     */
+    private fun maybeUpdateUserNameFromEmail(email: String) {
+        val manualOverride = prefs.getBoolean("user_name_manual", false)
+        if (manualOverride) return
+        val derived = deriveDisplayNameFromEmail(email)
+        if (derived.isNotBlank() && derived != _userName.value) {
+            _userName.value = derived
+            // Save WITHOUT setting the manual flag
+            prefs.edit().putString("user_name", derived).apply()
+        }
     }
 
     // Google Cloud Sync States
@@ -215,6 +236,15 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _onboardingCompleted = MutableStateFlow(prefs.getBoolean("onboarding_completed", false))
     val onboardingCompleted = _onboardingCompleted.asStateFlow()
 
+    // Live network status (true = device has internet)
+    val isOnline: StateFlow<Boolean> = com.secondream.keeper.util.NetworkObserver
+        .observe(application.applicationContext)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = com.secondream.keeper.util.NetworkObserver.isCurrentlyOnline(application.applicationContext)
+        )
+
     fun completeOnboarding() {
         _onboardingCompleted.value = true
         prefs.edit().putBoolean("onboarding_completed", true).apply()
@@ -222,6 +252,58 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     // Drive sync repository
     private val driveRepo: DriveSyncRepository = DriveSyncRepository(application.applicationContext)
+
+    // Per-note mutex map: serializes concurrent uploads for the same note
+    // to prevent duplicate folders being created on Drive in race conditions.
+    private val noteUploadLocks = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
+
+    // ─── Real-time upload progress (Drive sync banner) ───
+
+    /** A single ongoing upload tracked for the UI banner. */
+    data class UploadProgress(
+        val noteId: Long,
+        val noteTitle: String,
+        val currentFileName: String,
+        val bytesUploaded: Long,
+        val totalBytes: Long,
+        val isPaused: Boolean = false
+    ) {
+        val progress: Float
+            get() = if (totalBytes > 0) (bytesUploaded.toFloat() / totalBytes).coerceIn(0f, 1f)
+                    else 0f
+        val sizeMb: Float
+            get() = totalBytes / (1024f * 1024f)
+    }
+
+    // Active uploads keyed by noteId
+    private val _activeUploads = MutableStateFlow<Map<Long, UploadProgress>>(emptyMap())
+    val activeUploads: StateFlow<Map<Long, UploadProgress>> = _activeUploads.asStateFlow()
+
+    // User-paused note IDs (paused uploads are skipped until resumed)
+    private val _pausedNotes = MutableStateFlow<Set<Long>>(emptySet())
+    val pausedNotes: StateFlow<Set<Long>> = _pausedNotes.asStateFlow()
+
+    fun pauseUpload(noteId: Long) {
+        _pausedNotes.value = _pausedNotes.value + noteId
+        _activeUploads.value = _activeUploads.value.mapValues { (id, prog) ->
+            if (id == noteId) prog.copy(isPaused = true) else prog
+        }
+    }
+
+    fun resumeUpload(noteId: Long) {
+        _pausedNotes.value = _pausedNotes.value - noteId
+        _activeUploads.value = _activeUploads.value - noteId
+        // Retry the upload now
+        maybeAutoUploadNote(noteId)
+    }
+
+    private fun setUploadProgress(progress: UploadProgress) {
+        _activeUploads.value = _activeUploads.value + (progress.noteId to progress)
+    }
+
+    private fun clearUploadProgress(noteId: Long) {
+        _activeUploads.value = _activeUploads.value - noteId
+    }
 
     fun setAutoUploadEnabled(enabled: Boolean) {
         _autoUploadEnabled.value = enabled
@@ -280,13 +362,9 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                         .apply()
                     // First successful login completes onboarding
                     completeOnboarding()
-                    // Derive user name from email when it's still the default "Explorer"
-                    if (_userName.value == "Explorer" || _userName.value.isBlank()) {
-                        val derived = deriveDisplayNameFromEmail(email)
-                        if (derived.isNotBlank()) {
-                            setUserName(derived)
-                        }
-                    }
+                    // Refresh the display name from the connected account
+                    // (unless the user already overrode it manually)
+                    maybeUpdateUserNameFromEmail(email)
                     _syncMessage.value = "Connesso. Cartella Keeper pronta su Drive."
 
                     // Auto-import existing notes from Drive (covers the case
@@ -506,30 +584,83 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Try to upload a single note in the background.
      * Best-effort: failures are logged but don't surface to the UI.
+     *
+     * Race-condition guard: a per-note Mutex serializes concurrent uploads
+     * for the same noteId, otherwise rapid edits could trigger TWO concurrent
+     * folder-creation requests and produce duplicate folders on Drive.
      */
     private fun maybeAutoUploadNote(noteId: Long) {
         if (!_autoUploadEnabled.value) return
         if (!_isGoogleConnected.value) return
+        if (_pausedNotes.value.contains(noteId)) return // user-paused
+        if (!isOnline.value) return // offline — auto-retry will happen via observer
         val email = _googleEmail.value
         if (email.isBlank()) return
 
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val note = repository.getNoteByIdSync(noteId) ?: return@launch
-                val rootId = ensureRootFolderCached(email) ?: return@launch
-                when (val outcome = driveRepo.uploadNote(email, note, rootId)) {
-                    is DriveSyncRepository.SyncOutcome.Success -> {
-                        repository.updateDriveFolder(note.id, outcome.folderId, System.currentTimeMillis())
+            val lock = noteUploadLocks.getOrPut(noteId) { Mutex() }
+            lock.withLock {
+                try {
+                    val note = repository.getNoteByIdSync(noteId) ?: return@withLock
+                    val rootId = ensureRootFolderCached(email) ?: return@withLock
+                    val outcome = driveRepo.uploadNote(
+                        accountName = email,
+                        note = note,
+                        rootFolderId = rootId,
+                        progressListener = { fileName, uploaded, total ->
+                            // Don't show progress for tiny note.json
+                            if (total > 50_000L) {
+                                setUploadProgress(
+                                    UploadProgress(
+                                        noteId = note.id,
+                                        noteTitle = note.title.ifBlank { "Nota senza titolo" },
+                                        currentFileName = fileName,
+                                        bytesUploaded = uploaded,
+                                        totalBytes = total,
+                                        isPaused = _pausedNotes.value.contains(note.id)
+                                    )
+                                )
+                            }
+                        }
+                    )
+                    when (outcome) {
+                        is DriveSyncRepository.SyncOutcome.Success -> {
+                            repository.updateDriveFolder(note.id, outcome.folderId, System.currentTimeMillis())
+                        }
+                        is DriveSyncRepository.SyncOutcome.NeedsUserAction -> {
+                            _pendingAuthIntent.value = outcome.intent
+                        }
+                        is DriveSyncRepository.SyncOutcome.Failure -> {
+                            android.util.Log.w("DriveSync", "Auto-upload note $noteId: ${outcome.message}")
+                        }
                     }
-                    is DriveSyncRepository.SyncOutcome.NeedsUserAction -> {
-                        _pendingAuthIntent.value = outcome.intent
-                    }
-                    is DriveSyncRepository.SyncOutcome.Failure -> {
-                        android.util.Log.w("DriveSync", "Auto-upload note $noteId: ${outcome.message}")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    clearUploadProgress(noteId)
+                }
+            }
+        }
+    }
+
+    /**
+     * Auto-retry pending uploads when the device comes back online.
+     */
+    init {
+        viewModelScope.launch {
+            var wasOnline = isOnline.value
+            isOnline.collect { nowOnline ->
+                if (!wasOnline && nowOnline && _autoUploadEnabled.value && _isGoogleConnected.value) {
+                    // Network restored — try syncing any locally-modified notes
+                    val email = _googleEmail.value
+                    if (email.isNotBlank()) {
+                        viewModelScope.launch(Dispatchers.IO) {
+                            val rootId = ensureRootFolderCached(email) ?: return@launch
+                            syncAllNotesToDriveBlocking(email, rootId)
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+                wasOnline = nowOnline
             }
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,6 +55,7 @@ fun NoteApp(viewModel: NoteViewModel) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Dialog note editing state
     var selectedNoteForEdit by remember { mutableStateOf<Note?>(null) }
@@ -194,6 +196,7 @@ fun NoteApp(viewModel: NoteViewModel) {
         }
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 // Keep Style Top search header
                 Box(
@@ -341,21 +344,22 @@ fun NoteApp(viewModel: NoteViewModel) {
                 }
             }
         ) { paddingValues ->
-            AnimatedContent(
-                targetState = currentScreen,
-                transitionSpec = {
-                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
-                     scaleIn(initialScale = 0.95f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)))
-                        .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)))
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                label = "screen_transition"
-            ) { screen ->
-                if (screen is NavigationScreen.Settings) {
-                    SettingsView(viewModel = viewModel)
-                } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = currentScreen,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                         scaleIn(initialScale = 0.95f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)))
+                            .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)))
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    label = "screen_transition"
+                ) { screen ->
+                    if (screen is NavigationScreen.Settings) {
+                        SettingsView(viewModel = viewModel)
+                    } else {
                     // Main Note list view or empty state view
                     if (filteredNotes.isEmpty()) {
                         EmptyStateView(screen)
@@ -476,6 +480,23 @@ fun NoteApp(viewModel: NoteViewModel) {
                     }
                 }
             }
+                }   // close AnimatedContent screen lambda
+
+                // Floating banners over the scaffold content
+                OfflineBanner(
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = paddingValues.calculateTopPadding() + 4.dp)
+                )
+
+                UploadProgressBanner(
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = paddingValues.calculateBottomPadding() + 8.dp)
+                )
+            }   // close Box wrapper
         }
     }
 
@@ -539,8 +560,17 @@ fun NoteApp(viewModel: NoteViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
+                        val hadDriveFolder = note.driveFolderId != null
                         viewModel.deleteNotePermanently(note)
                         noteToDeletePermanently = null
+                        if (hadDriveFolder && isGoogleConnected) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Nota eliminata anche da Google Drive",
+                                    withDismissAction = true
+                                )
+                            }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -590,11 +620,6 @@ fun NoteItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .border(
-                width = 1.dp,
-                color = borderColor.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(24.dp)
-            )
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = cardBackground),
         elevation = CardDefaults.cardElevation(
@@ -681,23 +706,43 @@ fun NoteItemCard(
 
             // Checklist preview list
             if (checklist.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     checklist.take(4).forEach { item ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(
-                                imageVector = if (item.checked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                                contentDescription = "Todo Preview",
-                                tint = contentColor.copy(alpha = 0.6f),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            // Round Pixel-style indicator: filled yellow when checked,
+                            // outlined circle when not
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (item.checked) Color(0xFFFFCA28)
+                                        else Color.Transparent
+                                    )
+                                    .border(
+                                        width = if (item.checked) 0.dp else 1.4.dp,
+                                        color = contentColor.copy(alpha = 0.55f),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (item.checked) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF1A1A1A),
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = item.text,
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 color = if (item.checked) contentColor.copy(alpha = 0.4f) else contentColor,
                                 textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                                 maxLines = 1,
@@ -709,9 +754,9 @@ fun NoteItemCard(
                         Text(
                             text = stringResource(R.string.more_checklist_items, checklist.size - 4),
                             fontSize = 11.sp,
-                            color = contentColor.copy(alpha = 0.5f),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 20.dp, top = 2.dp)
+                            color = contentColor.copy(alpha = 0.55f),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 24.dp, top = 4.dp)
                         )
                     }
                 }

@@ -38,10 +38,20 @@ class DriveSyncRepository(
         data class Failure(val message: String) : SyncOutcome()
     }
 
+    /**
+     * Optional progress callback for upload tracking.
+     * - currentFileName: file currently being uploaded ("note.json" or attachment name)
+     * - bytesUploaded / totalBytes: byte counts for the file being uploaded
+     */
+    fun interface UploadProgressListener {
+        fun onProgress(currentFileName: String, bytesUploaded: Long, totalBytes: Long)
+    }
+
     suspend fun uploadNote(
         accountName: String,
         note: Note,
-        rootFolderId: String
+        rootFolderId: String,
+        progressListener: UploadProgressListener? = null
     ): SyncOutcome {
         val folderName = noteFolderName(note)
         val ensure = drive.ensureNoteFolder(
@@ -56,9 +66,11 @@ class DriveSyncRepository(
             is DriveSync.Result.Error -> return SyncOutcome.Failure(ensure.message)
         }
 
-        // 1. Upload note.json (always update — content may have changed)
+        // 1. Upload note.json
         val attachments = note.getAttachments()
         val noteJson = buildNoteJson(note, attachments)
+        val noteJsonBytes = noteJson.toByteArray(Charsets.UTF_8).size.toLong()
+        progressListener?.onProgress(DriveSync.NOTE_JSON_NAME, 0L, noteJsonBytes)
         val jsonResult = drive.upsertJsonFile(
             accountName = accountName,
             parentFolderId = folderId,
@@ -66,16 +78,20 @@ class DriveSyncRepository(
             jsonContent = noteJson
         )
         when (jsonResult) {
-            is DriveSync.Result.Success -> {}
+            is DriveSync.Result.Success -> {
+                progressListener?.onProgress(DriveSync.NOTE_JSON_NAME, noteJsonBytes, noteJsonBytes)
+            }
             is DriveSync.Result.NeedsUserAction -> return SyncOutcome.NeedsUserAction(jsonResult.intent)
             is DriveSync.Result.Error -> return SyncOutcome.Failure(jsonResult.message)
         }
 
-        // 2. Upload each attachment that exists locally and isn't already on Drive
+        // 2. Upload each attachment
         attachments.forEach { att ->
             val localFile = resolveLocalFile(att) ?: return@forEach
             val driveFileName = driveFileNameFor(att)
             val mimeType = mimeTypeFor(att)
+            val totalBytes = localFile.length()
+            progressListener?.onProgress(att.name, 0L, totalBytes)
             val uploadResult = drive.uploadAttachment(
                 accountName = accountName,
                 parentFolderId = folderId,
@@ -84,11 +100,11 @@ class DriveSyncRepository(
                 mimeType = mimeType
             )
             when (uploadResult) {
-                is DriveSync.Result.Success -> { /* ok */ }
+                is DriveSync.Result.Success -> {
+                    progressListener?.onProgress(att.name, totalBytes, totalBytes)
+                }
                 is DriveSync.Result.NeedsUserAction -> return SyncOutcome.NeedsUserAction(uploadResult.intent)
                 is DriveSync.Result.Error -> {
-                    // Don't abort the whole sync on one failed attachment, but log it
-                    // Caller can retry the note's sync later
                     android.util.Log.w("DriveSync", "Allegato non caricato: ${att.name} - ${uploadResult.message}")
                 }
             }

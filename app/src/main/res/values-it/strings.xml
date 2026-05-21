@@ -73,6 +73,7 @@
     <string name="drawer_sub">Mio Archivio Digitale</string>
     <string name="back_and_save">Indietro e Salva</string>
     <string name="sync_now">Sincronizza ora</string>
+    <string name="sync_auto_active">Sincronizzazione automatica attiva</string>
     <string name="never_backed_up">Mai eseguito</string>
     <string name="just_now">Adesso</string>
     <string name="more_checklist_items">+ %1$d altri elementi</string>
@@ -100,14 +101,18 @@
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">Benvenuto in Keeper</string>
     <string name="onboarding_welcome_subtitle">Il tuo block-notes privato, salvato sul tuo Google Drive.</string>
+    <string name="onboarding_intro_long">Keeper è un block-notes veloce e privato per qualsiasi cosa tu voglia ricordare. Scrivi note, allega foto, video e documenti, crea checklist, detta la voce: tutto resta sul tuo Google Drive.</string>
     <string name="onboarding_feature_backup_title">Backup automatico</string>
-    <string name="onboarding_feature_backup_body">Ogni nota e allegato viene salvato su Google Drive in tempo reale.</string>
+    <string name="onboarding_feature_backup_body">Ogni nota e allegato viene salvato sul tuo Drive in tempo reale, senza server intermedi.</string>
     <string name="onboarding_feature_private_title">Solo tuo</string>
-    <string name="onboarding_feature_private_body">Keeper usa una cartella privata dell\'app. Nessun altro può vedere le tue note.</string>
-    <string name="onboarding_feature_restore_title">Ripristina da qualsiasi dispositivo</string>
-    <string name="onboarding_feature_restore_body">Reinstalla l\'app e accedi: le tue note tornano con foto e video.</string>
+    <string name="onboarding_feature_private_body">Keeper usa una cartella privata dell\'app. Nessuno tranne te può vedere i file, nemmeno noi.</string>
+    <string name="onboarding_feature_restore_title">Ripristino su qualsiasi dispositivo</string>
+    <string name="onboarding_feature_restore_body">Reinstalla l\'app e accedi: le tue note tornano con foto e video intatti.</string>
+    <string name="onboarding_feature_rich_title">Note ricche</string>
+    <string name="onboarding_feature_rich_body">Testo, checklist, foto, video, PDF, ZIP e dettatura vocale: tutto in una singola nota.</string>
+    <string name="onboarding_drive_explain">Toccando Collega, Google chiederà una sola volta il permesso. Chiediamo accesso solo ai file che Keeper crea.</string>
     <string name="onboarding_connect_drive">Collega Google Drive</string>
-    <string name="onboarding_skip">Salta per ora</string>
+    <string name="onboarding_skip">Salta per ora (senza backup)</string>
 
     <!-- Donation &amp; About -->
     <string name="about_title">Informazioni su Keeper</string>

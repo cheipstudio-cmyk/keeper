@@ -73,6 +73,7 @@
     <string name="drawer_sub">My Digital Keep</string>
     <string name="back_and_save">Back and Save</string>
     <string name="sync_now">Sync Now</string>
+    <string name="sync_auto_active">Auto sync active</string>
     <string name="never_backed_up">Never backed up</string>
     <string name="just_now">Just now</string>
     <string name="more_checklist_items">+ %1$d more items</string>
@@ -100,14 +101,18 @@
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">Welcome to Keeper</string>
     <string name="onboarding_welcome_subtitle">Your private notebook, backed up to your own Google Drive.</string>
+    <string name="onboarding_intro_long">Keeper is a fast, private notebook for everything you want to remember. Take notes, attach photos, videos and documents, build checklists, record voice — everything stays in your own Google Drive.</string>
     <string name="onboarding_feature_backup_title">Automatic backup</string>
-    <string name="onboarding_feature_backup_body">Every note and attachment is saved to your Google Drive in real time.</string>
+    <string name="onboarding_feature_backup_body">Every note and attachment is saved to your Drive in real time, with no servers in the middle.</string>
     <string name="onboarding_feature_private_title">Only yours</string>
-    <string name="onboarding_feature_private_body">Keeper uses a private app folder. Nobody else can see your notes.</string>
-    <string name="onboarding_feature_restore_title">Restore from any device</string>
-    <string name="onboarding_feature_restore_body">Reinstall the app and log in: your notes come back with their photos and videos.</string>
+    <string name="onboarding_feature_private_body">Keeper uses an app-private folder. Nobody but you can see the files — not even us.</string>
+    <string name="onboarding_feature_restore_title">Restore on any device</string>
+    <string name="onboarding_feature_restore_body">Reinstall the app and log in: your notes come back with their photos and videos intact.</string>
+    <string name="onboarding_feature_rich_title">Rich notes</string>
+    <string name="onboarding_feature_rich_body">Text, checklists, photos, videos, PDFs, ZIPs and voice dictation — everything fits in one note.</string>
+    <string name="onboarding_drive_explain">When you tap Connect, Google will ask once for permission. We only request access to files Keeper itself creates.</string>
     <string name="onboarding_connect_drive">Connect Google Drive</string>
-    <string name="onboarding_skip">Skip for now</string>
+    <string name="onboarding_skip">Skip for now (no backup)</string>
 
     <!-- Donation &amp; About -->
     <string name="about_title">About Keeper</string>

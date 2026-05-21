@@ -452,6 +452,9 @@ fun SettingsView(
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                             )
 
+                            // Read autoUpload first since the sync button reacts to it
+                            val autoUploadEnabled by viewModel.autoUploadEnabled.collectAsState()
+
                             Button(
                                 onClick = {
                                     isBackingUp = true
@@ -468,8 +471,13 @@ fun SettingsView(
                                         }
                                     )
                                 },
+                                enabled = !autoUploadEnabled && !isBackingUp,
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    disabledContentColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                                ),
                                 shape = RoundedCornerShape(14.dp),
                                 contentPadding = PaddingValues(vertical = 12.dp)
                             ) {
@@ -478,13 +486,16 @@ fun SettingsView(
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CloudUpload,
-                                        contentDescription = "Sync Cloud icon",
+                                        imageVector = if (autoUploadEnabled) Icons.Default.CloudDone else Icons.Default.CloudUpload,
+                                        contentDescription = null,
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = stringResource(R.string.sync_now),
+                                        text = if (autoUploadEnabled)
+                                            stringResource(R.string.sync_auto_active)
+                                        else
+                                            stringResource(R.string.sync_now),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -494,7 +505,6 @@ fun SettingsView(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             // Auto-upload toggle
-                            val autoUploadEnabled by viewModel.autoUploadEnabled.collectAsState()
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
