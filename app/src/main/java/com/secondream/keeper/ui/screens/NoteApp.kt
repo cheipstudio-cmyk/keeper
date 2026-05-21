@@ -314,15 +314,23 @@ fun NoteApp(viewModel: NoteViewModel) {
                             )
                         },
                         floatingActionButton = {
-                            ExtendedFloatingActionButton(
+                            FloatingActionButton(
                                 onClick = { isCreatingNewNote = true },
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                shape = RoundedCornerShape(18.dp),
-                                elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
-                                text = { Text("Nota", fontWeight = FontWeight.Bold, fontSize = 14.sp) },
-                                icon = { Icon(Icons.Default.Add, stringResource(R.string.take_note)) }
-                            )
+                                containerColor = Color(0xFFFFCA28),
+                                contentColor = Color(0xFF1A1A1A),
+                                shape = CircleShape,
+                                elevation = FloatingActionButtonDefaults.elevation(
+                                    defaultElevation = 6.dp,
+                                    pressedElevation = 12.dp
+                                ),
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = stringResource(R.string.take_note),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
                         },
                         modifier = Modifier
                             .navigationBarsPadding()
@@ -385,7 +393,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                                             onClick = { selectedNoteForEdit = note },
                                             onPinClick = { viewModel.togglePinNote(note.id) },
                                             onTrashClick = { if (screen is NavigationScreen.Trash) noteToDeletePermanently = note else noteToTrash = note },
-                                            onArchiveClick = { viewModel.archiveNote(note.id) }
+                                            onArchiveClick = { if (note.isArchived) viewModel.unarchiveNote(note.id) else viewModel.archiveNote(note.id) }
                                         )
                                     }
                                     item(span = StaggeredGridItemSpan.FullLine) {
@@ -407,7 +415,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                                         onClick = { selectedNoteForEdit = note },
                                         onPinClick = { viewModel.togglePinNote(note.id) },
                                         onTrashClick = { if (screen is NavigationScreen.Trash) noteToDeletePermanently = note else noteToTrash = note },
-                                        onArchiveClick = { viewModel.archiveNote(note.id) }
+                                        onArchiveClick = { if (note.isArchived) viewModel.unarchiveNote(note.id) else viewModel.archiveNote(note.id) }
                                     )
                                 }
                             }
@@ -438,7 +446,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                                             onClick = { selectedNoteForEdit = note },
                                             onPinClick = { viewModel.togglePinNote(note.id) },
                                             onTrashClick = { if (screen is NavigationScreen.Trash) noteToDeletePermanently = note else noteToTrash = note },
-                                            onArchiveClick = { viewModel.archiveNote(note.id) }
+                                            onArchiveClick = { if (note.isArchived) viewModel.unarchiveNote(note.id) else viewModel.archiveNote(note.id) }
                                         )
                                     }
                                     item {
@@ -460,7 +468,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                                         onClick = { selectedNoteForEdit = note },
                                         onPinClick = { viewModel.togglePinNote(note.id) },
                                         onTrashClick = { if (screen is NavigationScreen.Trash) noteToDeletePermanently = note else noteToTrash = note },
-                                        onArchiveClick = { viewModel.archiveNote(note.id) }
+                                        onArchiveClick = { if (note.isArchived) viewModel.unarchiveNote(note.id) else viewModel.archiveNote(note.id) }
                                     )
                                 }
                             }
@@ -761,14 +769,14 @@ fun NoteItemCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Archive icon action shortcut
+                // Archive / Unarchive icon
                 IconButton(
                     onClick = onArchiveClick,
                     modifier = Modifier.size(30.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Archive,
-                        contentDescription = "Archive note link",
+                        imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                        contentDescription = if (note.isArchived) "Sposta nelle note" else "Archivia",
                         tint = contentColor.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )

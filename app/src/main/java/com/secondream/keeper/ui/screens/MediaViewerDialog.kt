@@ -214,20 +214,26 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
         }
     }
 
-    Column(
+    val progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f
+    val formatTime: (Long) -> String = { ms ->
+        val totalSec = ms / 1000
+        val seconds = totalSec % 60
+        val minutes = totalSec / 60
+        String.format("%d:%02d", minutes, seconds)
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // VIDEO area — fills the screen with bottom padding reserved for controls
+        // (220dp accounts for: title + size text + slider + spacer + 72dp FAB row + paddings)
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black),
+                .fillMaxSize()
+                .padding(bottom = 220.dp, top = 56.dp)
+                .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
             if (isError) {
@@ -246,119 +252,128 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
                     )
                 }
             } else {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = exoPlayer
-                            useController = false      // disable Media3 controls completely
-                            setBackgroundColor(android.graphics.Color.BLACK)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black)
+                ) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = false      // disable Media3 controls completely
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = attachment.name,
-            color = Color.White,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Video • ${attachment.size}",
-            color = Color.Gray,
-            fontSize = 13.sp
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Timeline (single, custom)
-        val progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f
-        val formatTime: (Long) -> String = { ms ->
-            val totalSec = ms / 1000
-            val seconds = totalSec % 60
-            val minutes = totalSec / 60
-            String.format("%d:%02d", minutes, seconds)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // CONTROLS row — always anchored to bottom, never clipped
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = formatTime(currentPosition),
-                color = Color.LightGray,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace
-            )
-            Slider(
-                value = progress.coerceIn(0f, 1f),
-                onValueChange = { newProgress ->
-                    if (duration > 0L) {
-                        val newPos = (newProgress * duration).toLong()
-                        exoPlayer.seekTo(newPos)
-                        currentPosition = newPos
-                    }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp),
-                colors = SliderDefaults.colors(
-                    activeTrackColor = Color(0xFFFFA000),
-                    inactiveTrackColor = Color.DarkGray,
-                    thumbColor = Color(0xFFFFCA28)
-                )
+                text = attachment.name,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
             Text(
-                text = formatTime(duration),
+                text = "Video • ${attachment.size}",
                 color = Color.LightGray,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace
+                fontSize = 12.sp
             )
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-        // Single unified control row: restart + one play/pause
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = {
-                    exoPlayer.seekTo(0L)
-                    currentPosition = 0L
-                },
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(Color.DarkGray.copy(alpha = 0.6f), CircleShape)
+            // Slider with timestamps
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Riavvia",
-                    tint = Color.White
+                Text(
+                    text = formatTime(currentPosition),
+                    color = Color.LightGray,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Slider(
+                    value = progress.coerceIn(0f, 1f),
+                    onValueChange = { newProgress ->
+                        if (duration > 0L) {
+                            val newPos = (newProgress * duration).toLong()
+                            exoPlayer.seekTo(newPos)
+                            currentPosition = newPos
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = Color(0xFFFFCA28),
+                        inactiveTrackColor = Color.DarkGray,
+                        thumbColor = Color(0xFFFFCA28)
+                    )
+                )
+                Text(
+                    text = formatTime(duration),
+                    color = Color.LightGray,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
                 )
             }
 
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            FloatingActionButton(
-                onClick = {
-                    if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                },
-                containerColor = Color(0xFFFFB300),
-                contentColor = Color.Black,
-                shape = CircleShape,
-                modifier = Modifier.size(72.dp)
+            // Restart + Play/Pause row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pausa" else "Riproduci",
-                    modifier = Modifier.size(36.dp)
-                )
+                IconButton(
+                    onClick = {
+                        exoPlayer.seekTo(0L)
+                        currentPosition = 0L
+                    },
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(Color.White.copy(alpha = 0.18f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Riavvia",
+                        tint = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(24.dp))
+
+                FloatingActionButton(
+                    onClick = {
+                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                    },
+                    containerColor = Color(0xFFFFCA28),
+                    contentColor = Color.Black,
+                    shape = CircleShape,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pausa" else "Riproduci",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
         }
     }
