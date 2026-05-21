@@ -1,0 +1,1458 @@
+package com.secondream.keeper.ui.screens
+
+import android.net.Uri
+import android.os.Bundle
+import android.provider.OpenableColumns
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import com.secondream.keeper.R
+import com.secondream.keeper.data.model.Attachment
+import com.secondream.keeper.data.model.ChecklistItem
+import com.secondream.keeper.data.model.Note
+import com.secondream.keeper.data.model.KeepColors
+import com.secondream.keeper.viewmodel.NoteViewModel
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun NoteDetailView(
+    note: Note?, // Null means "Create New Note"
+    viewModel: NoteViewModel,
+    initialLaunchType: String? = null,
+    onDismiss: () -> Unit
+) {
+    // Current draft notes fields
+    var title by remember { mutableStateOf(note?.title ?: "") }
+    var content by remember { mutableStateOf(note?.content ?: "") }
+    var colorHex by remember { mutableStateOf(note?.colorHex ?: viewModel.defaultNoteColor.value) }
+    var isPinned by remember { mutableStateOf(note?.isPinned ?: false) }
+    var labelsCSV by remember { mutableStateOf(note?.labels ?: "") }
+
+    // Checklists items
+    var checklistItems by remember {
+        mutableStateOf(note?.getChecklist() ?: emptyList())
+    }
+    var isChecklistActive by remember {
+        mutableStateOf(note?.getChecklist()?.isNotEmpty() == true)
+    }
+    var newChecklistItemText by remember { mutableStateOf("") }
+
+    // Attachments lists
+    val tempAttachments by viewModel.tempAttachments.collectAsState()
+    val uploadingTasks by viewModel.uploadingTasks.collectAsState()
+    var savedAttachments by remember {
+        mutableStateOf(note?.getAttachments() ?: emptyList())
+    }
+
+    // Combine saved and newly simulated uploaded attachments
+    val allAttachments = savedAttachments + tempAttachments
+
+    // Color selector state visibility
+    var showColorTray by remember { mutableStateOf(false) }
+    var showLabelPicker by remember { mutableStateOf(false) }
+
+    // Media viewer active state
+    var activeViewerAttachment by remember { mutableStateOf<Attachment?>(null) }
+
+    // Synchronize newly completed uploads into note detail dialog
+    LaunchedEffect(note?.id) {
+        viewModel.clearTempAttachments()
+    }
+
+    val themeIsDark = isSystemInDarkThemeCustom(viewModel)
+    val cardBackground = KeepColors.getColorForHex(colorHex, themeIsDark)
+    val contentColor = KeepColors.getContentColorForHex(colorHex, themeIsDark)
+
+    val context = LocalContext.current
+
+    // Voice dictation states
+    var showVoiceTray by remember { mutableStateOf(false) }
+    var dictationText by remember { mutableStateOf("") }
+    var isRecordingVoice by remember { mutableStateOf(false) }
+    var voiceError by remember { mutableStateOf<String?>(null) }
+
+    // Real on-device speech recognition (free, no API key)
+    val speechRecognizer = remember {
+        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        } else null
+    }
+
+    // Buffer that retains text confirmed before the current listening session so partial
+    // results from the recognizer never overwrite previously dictated content.
+    var dictationBaseText by remember { mutableStateOf("") }
+
+    DisposableEffect(speechRecognizer) {
+        onDispose {
+            try {
+                speechRecognizer?.destroy()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val startSpeechRecognition: () -> Unit = startRec@{
+        val rec = speechRecognizer
+        if (rec == null) {
+            voiceError = "Riconoscimento vocale non disponibile su questo dispositivo"
+            return@startRec
+        }
+        voiceError = null
+        dictationBaseText = if (dictationText.isBlank()) "" else dictationText.trimEnd() + " "
+        rec.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onError(error: Int) {
+                isRecordingVoice = false
+                voiceError = when (error) {
+                    SpeechRecognizer.ERROR_AUDIO -> "Errore audio"
+                    SpeechRecognizer.ERROR_CLIENT -> "Errore client"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permesso microfono mancante"
+                    SpeechRecognizer.ERROR_NETWORK -> "Errore di rete"
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Timeout di rete"
+                    SpeechRecognizer.ERROR_NO_MATCH -> "Nessun parlato riconosciuto"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Riconoscitore occupato, riprova"
+                    SpeechRecognizer.ERROR_SERVER -> "Errore del server"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Nessun parlato rilevato"
+                    else -> "Errore $error"
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull().orEmpty()
+                if (text.isNotBlank()) {
+                    dictationText = dictationBaseText + text
+                }
+            }
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull().orEmpty()
+                if (text.isNotBlank()) {
+                    dictationText = dictationBaseText + text
+                    dictationBaseText = dictationText.trimEnd() + " "
+                }
+                isRecordingVoice = false
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+        }
+        try {
+            rec.startListening(intent)
+            isRecordingVoice = true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            voiceError = "Impossibile avviare il riconoscimento: ${e.message}"
+            isRecordingVoice = false
+        }
+    }
+
+    val stopSpeechRecognition: () -> Unit = {
+        try {
+            speechRecognizer?.stopListening()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        isRecordingVoice = false
+    }
+
+    // Mic permission launcher: starts recognition immediately on grant
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startSpeechRecognition()
+        } else {
+            voiceError = "Permesso microfono negato"
+        }
+    }
+
+    val toggleVoiceDictation: () -> Unit = {
+        if (isRecordingVoice) {
+            stopSpeechRecognition()
+        } else {
+            val perm = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+            if (perm == PackageManager.PERMISSION_GRANTED) {
+                startSpeechRecognition()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    // Handlers for actual launcher selections
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            var name = "attached_file"
+            var size = "Unknown size"
+            try {
+                context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIdx != -1) name = cursor.getString(nameIdx)
+                        if (sizeIdx != -1) {
+                            val bytes = cursor.getLong(sizeIdx)
+                            size = when {
+                                bytes >= 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+                                bytes >= 1024 -> String.format("%d KB", bytes / 1024)
+                                else -> "$bytes Bytes"
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            if (name == "attached_file") {
+                name = "Image_${System.currentTimeMillis()}.jpg"
+            }
+            val localPath = copyUriToLocalFile(context, it)
+            savedAttachments = savedAttachments + Attachment(
+                id = java.util.UUID.randomUUID().toString(),
+                type = "image",
+                uri = localPath,
+                name = name,
+                size = size
+            )
+        }
+    }
+
+    val videoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            var name = "attached_file"
+            var size = "Unknown size"
+            try {
+                context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIdx != -1) name = cursor.getString(nameIdx)
+                        if (sizeIdx != -1) {
+                            val bytes = cursor.getLong(sizeIdx)
+                            size = when {
+                                bytes >= 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+                                bytes >= 1024 -> String.format("%d KB", bytes / 1024)
+                                else -> "$bytes Bytes"
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            if (name == "attached_file") {
+                name = "Video_${System.currentTimeMillis()}.mp4"
+            }
+            val localPath = copyUriToLocalFile(context, it)
+            savedAttachments = savedAttachments + Attachment(
+                id = java.util.UUID.randomUUID().toString(),
+                type = "video",
+                uri = localPath,
+                name = name,
+                size = size
+            )
+        }
+    }
+
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            var name = "attached_file"
+            var size = "Unknown size"
+            try {
+                context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIdx != -1) name = cursor.getString(nameIdx)
+                        if (sizeIdx != -1) {
+                            val bytes = cursor.getLong(sizeIdx)
+                            size = when {
+                                bytes >= 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+                                bytes >= 1024 -> String.format("%d KB", bytes / 1024)
+                                else -> "$bytes Bytes"
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            if (name == "attached_file") {
+                name = "Document_${System.currentTimeMillis()}.pdf"
+            }
+            val localPath = copyUriToLocalFile(context, it)
+            savedAttachments = savedAttachments + Attachment(
+                id = java.util.UUID.randomUUID().toString(),
+                type = "file",
+                uri = localPath,
+                name = name,
+                size = size
+            )
+        }
+    }
+
+    // Trigger initial picker or setup on startup
+    LaunchedEffect(initialLaunchType) {
+        when (initialLaunchType) {
+            "todo" -> {
+                isChecklistActive = true
+            }
+            "image" -> {
+                try {
+                    imageLauncher.launch("image/*")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            "file" -> {
+                try {
+                    fileLauncher.launch("*/*")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    // Voice synthesis dynamic transcription effect
+    LaunchedEffect(isRecordingVoice) {
+        if (isRecordingVoice) {
+            val file = java.io.File(context.cacheDir, "Audio_Nota_${System.currentTimeMillis()}.m4a")
+            activeAudioFile = file
+            var speechRecognizer: android.speech.SpeechRecognizer? = null
+            try {
+                val recorder = android.media.MediaRecorder().apply {
+                    setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                    setOutputFile(file.absolutePath)
+                    prepare()
+                    start()
+                }
+                activeMediaRecorder = recorder
+            } catch (e: Exception) {
+                e.printStackTrace()
+                try {
+                    file.createNewFile()
+                } catch (ioe: Exception) { ioe.printStackTrace() }
+            }
+
+            try {
+                // Real live Speech-to-Text Dictation
+                dictationText = ""
+                if (android.speech.SpeechRecognizer.isRecognitionAvailable(context)) {
+                    speechRecognizer = android.speech.SpeechRecognizer.createSpeechRecognizer(context).apply {
+                        setRecognitionListener(object : android.speech.RecognitionListener {
+                            override fun onReadyForSpeech(params: android.os.Bundle?) {}
+                            override fun onBeginningOfSpeech() {}
+                            override fun onRmsChanged(rmsdB: Float) {}
+                            override fun onBufferReceived(buffer: ByteArray?) {}
+                            override fun onEndOfSpeech() {}
+                            override fun onError(error: Int) {}
+                            override fun onResults(results: android.os.Bundle?) {
+                                val matches = results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)
+                                if (!matches.isNullOrEmpty()) {
+                                    dictationText = matches[0]
+                                }
+                            }
+                            override fun onPartialResults(partialResults: android.os.Bundle?) {
+                                val matches = partialResults?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)
+                                if (!matches.isNullOrEmpty()) {
+                                    dictationText = matches[0]
+                                }
+                            }
+                            override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+                        })
+                        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault().toString())
+                            putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                        }
+                        startListening(intent)
+                    }
+                }
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+            }
+
+            try {
+                // Wait while recording
+                while (isRecordingVoice) {
+                    kotlinx.coroutines.delay(100)
+                }
+            } finally {
+                // This is guaranteed to be executed when the coroutine is cancelled!
+                try {
+                    speechRecognizer?.stopListening()
+                    speechRecognizer?.destroy()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                speechRecognizer = null
+
+                try {
+                    activeMediaRecorder?.apply {
+                        stop()
+                        release()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                activeMediaRecorder = null
+            }
+        }
+    }
+
+    val saveAndDismiss: () -> Unit = {
+        if (title.isNotBlank() || content.isNotBlank() || checklistItems.isNotEmpty() || allAttachments.isNotEmpty()) {
+            if (note != null) {
+                viewModel.updateNote(
+                    note.copy(
+                        title = title,
+                        content = content,
+                        colorHex = colorHex,
+                        isPinned = isPinned,
+                        labels = labelsCSV,
+                        checklistJson = ChecklistItem.toJsonArray(checklistItems),
+                        attachmentsJson = Attachment.toJsonArray(allAttachments)
+                    )
+                )
+            } else {
+                viewModel.createNote(
+                    title = title,
+                    content = content,
+                    colorHex = colorHex,
+                    labelsList = labelsCSV.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                    checklistItems = checklistItems,
+                    attachmentsList = allAttachments,
+                    isPinned = isPinned
+                )
+            }
+        }
+        onDismiss()
+    }
+
+    BackHandler(enabled = true) {
+        saveAndDismiss()
+    }
+
+    val focusManager = LocalFocusManager.current
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(if (note == null) stringResource(R.string.new_note_title) else stringResource(R.string.edit_note_title)) },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = cardBackground,
+                        titleContentColor = contentColor,
+                        navigationIconContentColor = contentColor,
+                        actionIconContentColor = contentColor
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = { saveAndDismiss() }) {
+                            Icon(Icons.Default.ArrowBack, stringResource(R.string.back_and_save))
+                        }
+                    },
+                    actions = {
+                        // Pin Toggle icon
+                        IconButton(onClick = { isPinned = !isPinned }) {
+                            Icon(
+                                imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = stringResource(R.string.pin_tooltip)
+                            )
+                        }
+
+                        // Archive direct button (for existing notes)
+                        if (note != null) {
+                            IconButton(onClick = {
+                                viewModel.archiveNote(note.id)
+                                onDismiss()
+                            }) {
+                                Icon(Icons.Outlined.Archive, stringResource(R.string.archive_tooltip))
+                            }
+                        }
+                    }
+                )
+            },
+            containerColor = cardBackground,
+            contentColor = contentColor
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Main scroll container
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // Attachment Previews section (Always show beautiful grid)
+                    if (allAttachments.isNotEmpty()) {
+                        val attachmentTitle = if (allAttachments.size == 1) {
+                            stringResource(R.string.attachments_badge, 1)
+                        } else {
+                            stringResource(R.string.attachments_badge_plural, allAttachments.size)
+                        }
+                        Text(
+                            text = attachmentTitle.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = contentColor.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            allAttachments.forEach { attachment ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color.Black.copy(alpha = 0.05f))
+                                        .border(1.dp, contentColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                        .clickable { activeViewerAttachment = attachment }
+                                ) {
+                                    if (attachment.type == "image") {
+                                        val modelToLoad: Any = if (attachment.uri.startsWith("file://")) {
+                                            java.io.File(attachment.uri.removePrefix("file://"))
+                                        } else if (attachment.uri.startsWith("content://")) {
+                                            Uri.parse(attachment.uri)
+                                        } else {
+                                            attachment.uri
+                                        }
+                                        AsyncImage(
+                                            model = modelToLoad,
+                                            contentDescription = attachment.name,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        // Video / File Custom Cards
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(6.dp),
+                                            verticalArrangement = Arrangement.SpaceBetween,
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Icon(
+                                                imageVector = if (attachment.type == "video") Icons.Default.PlayCircle else Icons.Default.Description,
+                                                contentDescription = attachment.type,
+                                                tint = contentColor.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                            Text(
+                                                text = attachment.name,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                color = contentColor
+                                            )
+                                            Text(
+                                                text = attachment.size,
+                                                fontSize = 10.sp,
+                                                color = contentColor.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+
+                                    // Remove attachment icon button
+                                    IconButton(
+                                        onClick = {
+                                            if (tempAttachments.contains(attachment)) {
+                                                viewModel.removeTempAttachment(attachment.id)
+                                            } else {
+                                                savedAttachments = savedAttachments.filter { it.id != attachment.id }
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .align(Alignment.TopEnd)
+                                            .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Remove File",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    // Active simulation upload tasks (Linear progress bars)
+                    if (uploadingTasks.isNotEmpty()) {
+                        Text(
+                            text = "SIMULATED FILE UPLOADING...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFE65100),
+                            fontWeight = FontWeight.Bold
+                        )
+                        uploadingTasks.forEach { task ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.05f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (task.type == "video") Icons.Filled.VideoFile else Icons.Filled.InsertDriveFile,
+                                        contentDescription = task.type,
+                                        tint = contentColor
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(task.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = contentColor)
+                                        LinearProgressIndicator(
+                                            progress = { task.progress },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                                .clip(RoundedCornerShape(4.dp)),
+                                            color = Color(0xFFF57C00),
+                                            trackColor = Color.LightGray.copy(alpha = 0.4f),
+                                        )
+                                        Text(
+                                            "${(task.progress * 100).toInt()}% • ${task.size}",
+                                            fontSize = 11.sp,
+                                            color = contentColor.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    // Note Inputs
+                    TextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        placeholder = { Text(stringResource(R.string.title_placeholder), fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp,
+                            color = contentColor
+                        ),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = contentColor,
+                            unfocusedTextColor = contentColor,
+                            focusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
+                            unfocusedPlaceholderColor = contentColor.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    TextField(
+                        value = content,
+                        onValueChange = { content = it },
+                        placeholder = { Text(stringResource(R.string.content_placeholder), fontSize = 16.sp) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, color = contentColor),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = contentColor,
+                            unfocusedTextColor = contentColor,
+                            focusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
+                            unfocusedPlaceholderColor = contentColor.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 24.dp)
+                    )
+
+                    // Inline Quick Composing Tools inside the note block
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SuggestionChip(
+                            onClick = { imageLauncher.launch("image/*") },
+                            label = { Text("Immagine", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            icon = { Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = contentColor.copy(alpha = 0.08f),
+                                labelColor = contentColor,
+                                iconContentColor = contentColor
+                            ),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                enabled = true,
+                                borderColor = contentColor.copy(alpha = 0.15f)
+                            )
+                        )
+
+                        SuggestionChip(
+                            onClick = { fileLauncher.launch("*/*") },
+                            label = { Text("Allegato", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            icon = { Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = contentColor.copy(alpha = 0.08f),
+                                labelColor = contentColor,
+                                iconContentColor = contentColor
+                            ),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                enabled = true,
+                                borderColor = contentColor.copy(alpha = 0.15f)
+                            )
+                        )
+
+                        SuggestionChip(
+                            onClick = {
+                                isChecklistActive = true
+                            },
+                            label = { Text("Checklist", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            icon = { Icon(Icons.Outlined.CheckBox, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = contentColor.copy(alpha = 0.08f),
+                                labelColor = contentColor,
+                                iconContentColor = contentColor
+                            ),
+                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                enabled = true,
+                                borderColor = contentColor.copy(alpha = 0.15f)
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Checklist Section (if activated/non-empty)
+                    if (isChecklistActive || checklistItems.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.03f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.List, "Checklist")
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            stringResource(R.string.checklist_header, checklistItems.size),
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp,
+                                            color = contentColor
+                                        )
+                                    }
+
+                                    if (checklistItems.isNotEmpty()) {
+                                        TextButton(onClick = {
+                                            val checklistText = checklistItems.joinToString("\n") { item ->
+                                                if (item.checked) "• [x] ${item.text}" else "• [ ] ${item.text}"
+                                            }
+                                            content = if (content.isNotBlank()) "$content\n\n$checklistText" else checklistText
+                                            checklistItems = emptyList()
+                                            isChecklistActive = false
+                                        }) {
+                                            Text(stringResource(R.string.convert_to_text), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+
+                                // Render dynamic editable checklist list
+                                Column {
+                                    checklistItems.forEachIndexed { idx, item ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 0.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Checkbox(
+                                                checked = item.checked,
+                                                onCheckedChange = { checked ->
+                                                    checklistItems = checklistItems.mapIndexed { i, it ->
+                                                        if (i == idx) it.copy(checked = checked) else it
+                                                    }
+                                                },
+                                                colors = CheckboxDefaults.colors(
+                                                    checkedColor = Color(0xFFF57C00),
+                                                    checkmarkColor = Color.White
+                                                )
+                                            )
+                                            TextField(
+                                                value = item.text,
+                                                onValueChange = { newTxt ->
+                                                    checklistItems = checklistItems.mapIndexed { i, it ->
+                                                        if (i == idx) it.copy(text = newTxt) else it
+                                                    }
+                                                },
+                                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontSize = 14.sp,
+                                                    textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                                                    color = if (item.checked) contentColor.copy(alpha = 0.5f) else contentColor
+                                                ),
+                                                colors = TextFieldDefaults.colors(
+                                                    focusedContainerColor = Color.Transparent,
+                                                    unfocusedContainerColor = Color.Transparent,
+                                                    disabledContainerColor = Color.Transparent,
+                                                    focusedIndicatorColor = Color.Transparent,
+                                                    unfocusedIndicatorColor = Color.Transparent,
+                                                    focusedTextColor = contentColor,
+                                                    unfocusedTextColor = contentColor
+                                                ),
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            IconButton(onClick = {
+                                                checklistItems = checklistItems.filterIndexed { i, _ -> i != idx }
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Delete item",
+                                                    tint = contentColor.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Quick Append Checklist Item
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "New item link",
+                                            tint = contentColor.copy(alpha = 0.6f)
+                                        )
+                                        TextField(
+                                            value = newChecklistItemText,
+                                            onValueChange = { newChecklistItemText = it },
+                                            placeholder = { Text(stringResource(R.string.checklist_placeholder), fontSize = 14.sp) },
+                                            singleLine = true,
+                                            colors = TextFieldDefaults.colors(
+                                                focusedContainerColor = Color.Transparent,
+                                                unfocusedContainerColor = Color.Transparent,
+                                                focusedIndicatorColor = Color.Transparent,
+                                                unfocusedIndicatorColor = Color.Transparent,
+                                                focusedTextColor = contentColor,
+                                                unfocusedTextColor = contentColor
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                if (newChecklistItemText.isNotBlank()) {
+                                                    checklistItems = checklistItems + ChecklistItem(newChecklistItemText)
+                                                    newChecklistItemText = ""
+                                                }
+                                            },
+                                            enabled = newChecklistItemText.isNotBlank()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Save Checklist Item",
+                                                tint = if (newChecklistItemText.isNotBlank()) Color(0xFF2E7D32) else Color.Gray
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Direct Labels Input Bar
+                    if (showLabelPicker) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = labelsCSV,
+                                onValueChange = { labelsCSV = it },
+                                label = { Text(stringResource(R.string.add_tags_label)) },
+                                placeholder = { Text("Esempio: Spesa, Lavoro, Idee") },
+                                supportingText = { Text("Inserisci le etichette separate da virgole", fontSize = 11.sp, color = contentColor.copy(alpha = 0.6f)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = contentColor,
+                                    unfocusedBorderColor = contentColor.copy(alpha = 0.3f),
+                                    focusedTextColor = contentColor,
+                                    unfocusedTextColor = contentColor,
+                                    focusedLabelColor = contentColor,
+                                    unfocusedLabelColor = contentColor.copy(alpha = 0.6f),
+                                    focusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
+                                    unfocusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
+                                    cursorColor = contentColor
+                                )
+                            )
+
+                            // Quick tag chips suggestions
+                            val quickSuggestionSet = listOf("Personale", "Lavoro", "Idee", "Viaggi", "Sincronizzato", "Cloud")
+                            val currentLabels = labelsCSV.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+                            Text(
+                                text = "Tocca un tag rapido per aggiungerlo o rimuoverlo:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = contentColor.copy(alpha = 0.6f)
+                            )
+
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                quickSuggestionSet.forEach { quickTag ->
+                                    val isTagged = currentLabels.any { it.equals(quickTag, ignoreCase = true) }
+                                    val chipBg = if (isTagged) contentColor.copy(alpha = 0.12f) else Color.Transparent
+                                    val chipBorderColor = if (isTagged) contentColor else contentColor.copy(alpha = 0.25f)
+
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(chipBg)
+                                            .border(1.dp, chipBorderColor, RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                if (isTagged) {
+                                                    // Case-insensitive removal
+                                                    labelsCSV = currentLabels
+                                                        .filter { !it.equals(quickTag, ignoreCase = true) }
+                                                        .joinToString(", ")
+                                                } else {
+                                                    // Add
+                                                    labelsCSV = if (labelsCSV.trim().isBlank()) {
+                                                        quickTag
+                                                    } else {
+                                                        "${labelsCSV.trim().removeSuffix(",")}, $quickTag"
+                                                    }
+                                                }
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            if (isTagged) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Active tag indicator",
+                                                    tint = contentColor,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = quickTag,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = contentColor
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if (labelsCSV.isNotBlank()) {
+                        FlowRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            labelsCSV.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { label ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = contentColor.copy(alpha = 0.08f)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = contentColor)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove tag",
+                                            tint = contentColor.copy(alpha = 0.6f),
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clickable {
+                                                    labelsCSV = labelsCSV
+                                                        .split(",")
+                                                        .map { it.trim() }
+                                                        .filter { it.isNotEmpty() && it != label }
+                                                        .joinToString(",")
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(110.dp)) // Leave room for action toolbar
+                }
+
+                // BOTTOM ACTION TOOLBAR
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(cardBackground)
+                ) {
+                    Divider(color = contentColor.copy(alpha = 0.15f))
+
+                    // Expanded Color Tray Panel
+                    AnimatedVisibility(
+                        visible = showColorTray,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(cardBackground)
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.select_bg_color),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = contentColor.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(KeepColors.colors) { item ->
+                                    val itemBgColor = Color(android.graphics.Color.parseColor(if (themeIsDark) item.darkHex else item.lightHex))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .clip(CircleShape)
+                                            .background(itemBgColor)
+                                            .border(
+                                                width = if (colorHex == item.lightHex || colorHex == item.darkHex) 3.dp else 1.dp,
+                                                color = if (colorHex == item.lightHex || colorHex == item.darkHex) Color(0xFFFF9100) else Color.Gray.copy(alpha = 0.4f),
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                colorHex = if (themeIsDark) item.darkHex else item.lightHex
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (colorHex == item.lightHex || colorHex == item.darkHex) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Chosen color",
+                                                tint = Color(0xFFFF9100)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Expanded Voice Dictation Wave Panel
+                    AnimatedVisibility(
+                        visible = showVoiceTray,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                                .border(1.dp, contentColor.copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
+                            colors = CardDefaults.cardColors(
+                                containerColor = contentColor.copy(alpha = 0.05f)
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Mic,
+                                            contentDescription = "Mic",
+                                            tint = if (isRecordingVoice) Color(0xFFE53935) else contentColor
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = stringResource(R.string.voice_recorder_title),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = contentColor
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        if (isRecordingVoice) stopSpeechRecognition()
+                                        showVoiceTray = false
+                                    }) {
+                                        Icon(Icons.Default.Close, "Close", tint = contentColor.copy(alpha = 0.6f))
+                                    }
+                                }
+
+                                Text(
+                                    text = stringResource(R.string.voice_recorder_desc),
+                                    fontSize = 12.sp,
+                                    color = contentColor.copy(alpha = 0.6f),
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+
+                                voiceError?.let { err ->
+                                    Text(
+                                        text = err,
+                                        color = Color(0xFFE53935),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
+
+                                if (isRecordingVoice) {
+                                    Row(
+                                        modifier = Modifier
+                                            .height(40.dp)
+                                            .fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val infiniteTransition = rememberInfiniteTransition(label = "wave")
+                                        val heights = listOf(1, 2, 3, 4, 5).map { index ->
+                                            infiniteTransition.animateFloat(
+                                                initialValue = 10f,
+                                                targetValue = 35f,
+                                                animationSpec = infiniteRepeatable(
+                                                    animation = tween(
+                                                        durationMillis = 250 + (index * 120),
+                                                        easing = FastOutSlowInEasing
+                                                    ),
+                                                    repeatMode = RepeatMode.Reverse
+                                                ),
+                                                label = "bar_$index"
+                                            )
+                                        }
+
+                                        heights.forEach { heightVal ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(horizontal = 3.dp)
+                                                    .width(4.dp)
+                                                    .height(heightVal.value.dp)
+                                                    .clip(RoundedCornerShape(2.dp))
+                                                    .background(Color(0xFFE53935))
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                OutlinedTextField(
+                                    value = dictationText,
+                                    onValueChange = { dictationText = it },
+                                    placeholder = {
+                                        Text(
+                                            text = if (isRecordingVoice) stringResource(R.string.voice_transcribing) else stringResource(R.string.voice_placeholder),
+                                            fontSize = 13.sp,
+                                            color = contentColor.copy(alpha = 0.5f)
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 90.dp, max = 200.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = contentColor,
+                                        unfocusedBorderColor = contentColor.copy(alpha = 0.2f),
+                                        focusedTextColor = contentColor,
+                                        unfocusedTextColor = contentColor,
+                                        cursorColor = contentColor
+                                    ),
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp)
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(
+                                        onClick = { toggleVoiceDictation() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isRecordingVoice) Color(0xFF424242) else Color(0xFFE53935),
+                                            contentColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isRecordingVoice) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isRecordingVoice) stringResource(R.string.voice_stop) else stringResource(R.string.voice_start),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    if (dictationText.isNotEmpty()) {
+                                        Button(
+                                            onClick = {
+                                                if (isRecordingVoice) stopSpeechRecognition()
+                                                content = if (content.isNotBlank()) "$content\n$dictationText" else dictationText
+                                                dictationText = ""
+                                                dictationBaseText = ""
+                                                showVoiceTray = false
+                                                voiceError = null
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = contentColor,
+                                                contentColor = cardBackground
+                                            ),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Check, null)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(stringResource(R.string.convert_to_text), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Main Tool buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Color panel switcher
+                            IconButton(onClick = { showColorTray = !showColorTray }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Palette,
+                                    contentDescription = stringResource(R.string.palette_tooltip),
+                                    tint = contentColor
+                                )
+                            }
+
+                            // Tags label switch
+                            IconButton(onClick = { showLabelPicker = !showLabelPicker }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Label,
+                                    contentDescription = stringResource(R.string.tags_tooltip),
+                                    tint = contentColor
+                                )
+                            }
+
+                            // CHECKLIST INITIATE / EXTENDER
+                            IconButton(
+                                onClick = {
+                                    isChecklistActive = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CheckBox,
+                                    contentDescription = stringResource(R.string.checklist_tooltip),
+                                    tint = contentColor
+                                )
+                            }
+
+                            // Voice Dictation Panel Switcher
+                            IconButton(onClick = { showVoiceTray = !showVoiceTray }) {
+                                Icon(
+                                    imageVector = if (showVoiceTray) Icons.Filled.Mic else Icons.Outlined.Mic,
+                                    contentDescription = stringResource(R.string.voice_recorder_title),
+                                    tint = if (showVoiceTray) Color(0xFFE53935) else contentColor
+                                )
+                            }
+                        }
+
+                        // ATTACHMENT SIMULATED UPLOADS MENU
+                        var showAttachmentMenu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { showAttachmentMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.AttachFile,
+                                    contentDescription = stringResource(R.string.attach_file_tooltip),
+                                    tint = contentColor
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showAttachmentMenu,
+                                onDismissRequest = { showAttachmentMenu = false }
+                            ) {
+                                // 1. Real Picker Options
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.real_picker_image)) },
+                                    leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, "Img") },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        imageLauncher.launch("image/*")
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.real_picker_video)) },
+                                    leadingIcon = { Icon(Icons.Default.VideoCall, "Vid") },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        videoLauncher.launch("video/*")
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.real_picker_file)) },
+                                    leadingIcon = { Icon(Icons.Default.UploadFile, "Doc") },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        fileLauncher.launch("*/*")
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    // Attachment Full-Screen media playing modal
+    activeViewerAttachment?.let { attachment ->
+        MediaViewerDialog(
+            attachment = attachment,
+            onDismiss = { activeViewerAttachment = null }
+        )
+    }
+}
+
+@Composable
+fun isSystemInDarkThemeCustom(viewModel: NoteViewModel): Boolean {
+    val darkPref by viewModel.darkThemeOption.collectAsState()
+    return when (darkPref) {
+        "light" -> false
+        "dark" -> true
+        else -> androidx.compose.foundation.isSystemInDarkTheme()
+    }
+}
+
+fun copyUriToLocalFile(context: android.content.Context, uri: Uri): String {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()
+        val type = context.contentResolver.getType(uri)
+        val extension = when {
+            type?.startsWith("image/") == true -> "jpg"
+            type?.startsWith("video/") == true -> "mp4"
+            else -> "pdf"
+        }
+        val file = java.io.File(context.cacheDir, "attached_${System.currentTimeMillis()}.$extension")
+        inputStream.use { input ->
+            file.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        "file://" + file.absolutePath
+    } catch (e: Exception) {
+        e.printStackTrace()
+        uri.toString()
+    }
+}

@@ -1,0 +1,99 @@
+<resources>
+    <string name="app_name">Keeper</string>
+    <string name="screen_notes">Note</string>
+    <string name="screen_reminders">Promemoria e Checklist</string>
+    <string name="screen_archive">Archivio</string>
+    <string name="screen_trash">Cestino</string>
+    <string name="screen_settings">Impostazioni</string>
+    <string name="dynamic_labels_header">TAG E ETICHETTE</string>
+
+    <string name="search_hint">Cerca nelle tue note...</string>
+    <string name="toggle_grid">Alterna griglia</string>
+    <string name="take_note">Scrivi una nota...</string>
+    <string name="add_todo">Aggiungi checklist</string>
+    <string name="add_image">Aggiungi immagine</string>
+    <string name="add_file">Aggiungi file</string>
+    <string name="pinned_ideas">IN EVIDENZA</string>
+    <string name="others">ALTRE NOTE</string>
+
+    <string name="pin_tooltip">Metti in evidenza</string>
+    <string name="attachments_badge">%1$d allegato</string>
+    <string name="attachments_badge_plural">%1$d allegati</string>
+    <string name="archive_tooltip">Archivia nota</string>
+    <string name="trash_tooltip">Sposta nel cestino</string>
+
+    <string name="empty_notes">Le tue note appariranno qui</string>
+    <string name="empty_reminders">Le checklist e i promemoria saranno mostrati qui</string>
+    <string name="empty_archive">Le note archiviate sono custodite qui</string>
+    <string name="empty_trash">Il cestino è vuoto</string>
+    <string name="empty_label">Nessuna nota con questa etichetta</string>
+    <string name="empty_settings">Nessuna opzione trovata</string>
+
+    <string name="new_note_title">Nuova nota</string>
+    <string name="edit_note_title">Modifica nota</string>
+    <string name="title_placeholder">Titolo</string>
+    <string name="content_placeholder">Dettagli della nota...</string>
+    <string name="checklist_header">ELEMENTI CHECKLIST (%1$d)</string>
+    <string name="convert_to_text">Converti in testo</string>
+    <string name="checklist_placeholder">Elemento della checklist...</string>
+    <string name="add_tags_label">Tag / Etichette (separati da virgola, es. Lavoro,Personale)</string>
+    <string name="select_bg_color">SELEZIONA COLORE DI SFONDO</string>
+    <string name="palette_tooltip">Tavolozza colori</string>
+    <string name="tags_tooltip">Aggiungi etichette</string>
+    <string name="checklist_tooltip">Abilita checklist</string>
+    <string name="attach_file_tooltip">Allega file o immagini</string>
+    <string name="unsupported_format">Tipo di file non supportato</string>
+
+    <string name="real_picker_image">Carica immagine dal dispositivo</string>
+    <string name="real_picker_video">Carica video dal dispositivo</string>
+    <string name="real_picker_file">Carica file o PDF dal dispositivo</string>
+    <string name="simulated_image">Aggiungi immagine d\'esempio (Spiaggia)</string>
+    <string name="simulated_image2">Aggiungi immagine d\'esempio (Monstera)</string>
+    <string name="simulated_video">Aggiungi video d\'esempio (Oceano)</string>
+    <string name="simulated_doc">Aggiungi documento d\'esempio (Viaggio)</string>
+
+    <string name="settings_hdr">Impostazioni</string>
+    <string name="settings_sub">Personalizza le tue note e il layout</string>
+    <string name="app_theme_header">TEMA DELL\'APPLICAZIONE</string>
+    <string name="theme_system">Predefinito di sistema</string>
+    <string name="theme_light">Tema chiaro</string>
+    <string name="theme_dark">Tema scuro</string>
+    <string name="default_note_color_header">COLORE NOTA PREDEFINITO</string>
+    <string name="explorer_profile_header">PROFILO UTENTE</string>
+    <string name="primary_user">Utente principale: %1$s</string>
+    <string name="simulated_backup_header">BACKUP DI SICUREZZA LOCALE</string>
+    <string name="simulated_backup_sub">Proteggi le note salvando una copia nel database SQLite del dispositivo.</string>
+    <string name="running_backup_status">Backup delle note in corso... %1$d%% completato</string>
+    <string name="last_sync_label">Ultimo backup: %1$s</string>
+    <string name="voice_recorder_title">Dettatura Vocale (Sintesi Vocale)</string>
+    <string name="voice_recorder_desc">Parla chiaramente. La tua voce sarà trascritta direttamente nella nota in tempo reale.</string>
+    <string name="voice_start">Inizia registrazione</string>
+    <string name="voice_stop">Ferma registrazione</string>
+    <string name="drawer_greeting">Ciao, %1$s!</string>
+    <string name="drawer_sub">Mio Archivio Digitale</string>
+    <string name="back_and_save">Indietro e Salva</string>
+    <string name="sync_now">Sincronizza ora</string>
+    <string name="never_backed_up">Mai eseguito</string>
+    <string name="just_now">Adesso</string>
+    <string name="more_checklist_items">+ %1$d altri elementi</string>
+    <string name="voice_placeholder">Parla o digita direttamente qui…</string>
+    <string name="voice_transcribing">Trascrizione in corso…</string>
+
+    <!-- Google Sync / Backup -->
+    <string name="google_account_header">ACCOUNT GOOGLE</string>
+    <string name="google_backup_header">BACKUP SU ACCOUNT GOOGLE</string>
+    <string name="google_backup_sub">Sincronizza e carica le tue note e i file allegati su Google Drive.</string>
+    <string name="connect_google_account">Connetti Account Google</string>
+    <string name="disconnect_google_account">Disconnetti account</string>
+    <string name="google_account_connected">Connesso come %1$s</string>
+    <string name="select_google_account">Seleziona Account per il Backup</string>
+    <string name="synchronizing_google_drive">Sincronizzazione con Google Drive… %1$d%%</string>
+
+    <!-- Delete Confirmation Dialog -->
+    <string name="delete_confirm_title">Eliminare la nota?</string>
+    <string name="delete_confirm_msg">Sei sicuro di voler spostare questa nota nel cestino? Potrai ripristinarla in qualsiasi momento.</string>
+    <string name="delete_confirm_title_permanent">Eliminare definitivamente?</string>
+    <string name="delete_confirm_msg_permanent">Sei sicuro di voler eliminare definitivamente questa nota? Questa azione non può essere annullata.</string>
+    <string name="delete_confirm_delete">Elimina</string>
+    <string name="delete_confirm_cancel">Annulla</string>
+</resources>

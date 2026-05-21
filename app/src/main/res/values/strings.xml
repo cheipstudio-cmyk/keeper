@@ -1,0 +1,99 @@
+<resources>
+    <string name="app_name">Keeper</string>
+    <string name="screen_notes">Notes</string>
+    <string name="screen_reminders">Reminders &amp; Checklists</string>
+    <string name="screen_archive">Archive</string>
+    <string name="screen_trash">Trash</string>
+    <string name="screen_settings">Settings</string>
+    <string name="dynamic_labels_header">DYNAMIC LABELS</string>
+
+    <string name="search_hint">Search your Keep ideas...</string>
+    <string name="toggle_grid">Toggle Grid Layout</string>
+    <string name="take_note">Take a Note</string>
+    <string name="add_todo">Add ToDo</string>
+    <string name="add_image">Add Image</string>
+    <string name="add_file">Add File</string>
+    <string name="pinned_ideas">PINNED IDEAS</string>
+    <string name="others">OTHERS</string>
+
+    <string name="pin_tooltip">Pin notes</string>
+    <string name="attachments_badge">%1$d Attachment</string>
+    <string name="attachments_badge_plural">%1$d Attachments</string>
+    <string name="archive_tooltip">Archive note</string>
+    <string name="trash_tooltip">Trash Note</string>
+
+    <string name="empty_notes">Your Keep notes will appear here</string>
+    <string name="empty_reminders">ToDos checklist filters are clear</string>
+    <string name="empty_archive">Archived ideas safe and sound</string>
+    <string name="empty_trash">No ideas trashed permanently</string>
+    <string name="empty_label">No notes associated under this tag</string>
+    <string name="empty_settings">Config tray empty</string>
+
+    <string name="new_note_title">New Note</string>
+    <string name="edit_note_title">Edit Note</string>
+    <string name="title_placeholder">Title</string>
+    <string name="content_placeholder">Note content details...</string>
+    <string name="checklist_header">CHECKLIST ITEMS (%1$d)</string>
+    <string name="convert_to_text">Convert to Text</string>
+    <string name="checklist_placeholder">List item description...</string>
+    <string name="add_tags_label">Tags / Labels (comma-separated, e.g. Work,Personal)</string>
+    <string name="select_bg_color">SELECT BACKGROUND COLOR</string>
+    <string name="palette_tooltip">Palette</string>
+    <string name="tags_tooltip">Add tags</string>
+    <string name="checklist_tooltip">Initiate Checklist</string>
+    <string name="attach_file_tooltip">Add Files &amp; Images</string>
+    <string name="unsupported_format">Unsupported file type</string>
+
+    <string name="real_picker_image">Insert Real Image from Device</string>
+    <string name="real_picker_video">Insert Real Video from Device</string>
+    <string name="real_picker_file">Insert Real File/PDF from Device</string>
+    <string name="simulated_image">Add Example Image (Beach)</string>
+    <string name="simulated_image2">Add Example Image (Monstera)</string>
+    <string name="simulated_video">Add Example Video (waves.mp4)</string>
+    <string name="simulated_doc">Add Example Document (itinerary.pdf)</string>
+
+    <string name="settings_hdr">Keep Settings</string>
+    <string name="settings_sub">Personalize your notes and dashboard layout</string>
+    <string name="app_theme_header">APPLICATION THEME</string>
+    <string name="theme_system">System Default Theme</string>
+    <string name="theme_light">Light Theme</string>
+    <string name="theme_dark">Dark Theme</string>
+    <string name="default_note_color_header">DEFAULT NOTE CONTAINER COLOR</string>
+    <string name="explorer_profile_header">EXPLORER PROFILE</string>
+    <string name="primary_user">Primary User: %1$s</string>
+    <string name="simulated_backup_header">SIMULATED LOCAL CLOUD BACKUP</string>
+    <string name="simulated_backup_sub">Keep notes safe by backing up SQLite entities locally.</string>
+    <string name="running_backup_status">Backing up notes context... %1$d%% Done</string>
+    <string name="last_sync_label">Last sync: %1$s</string>
+    <string name="voice_recorder_title">Voice Dictation (Talk to write)</string>
+    <string name="voice_recorder_desc">Speak clearly. Your voice is transcribed dynamically into note contents.</string>
+    <string name="voice_start">Start Recording</string>
+    <string name="voice_stop">Stop Dictating</string>
+    <string name="drawer_greeting">Hello, %1$s!</string>
+    <string name="drawer_sub">My Digital Keep</string>
+    <string name="back_and_save">Back and Save</string>
+    <string name="sync_now">Sync Now</string>
+    <string name="never_backed_up">Never backed up</string>
+    <string name="just_now">Just now</string>
+    <string name="more_checklist_items">+ %1$d more items</string>
+    <string name="voice_placeholder">Speak or type text directly here…</string>
+    <string name="voice_transcribing">Transcription in progress…</string>
+
+    <!-- Google Sync / Backup -->
+    <string name="google_account_header">GOOGLE ACCOUNT</string>
+    <string name="google_backup_header">BACKUP ON GOOGLE ACCOUNT</string>
+    <string name="google_backup_sub">Sync and backup your notes and attachments to Google Drive securely.</string>
+    <string name="connect_google_account">Connect Google Account</string>
+    <string name="disconnect_google_account">Disconnect account</string>
+    <string name="google_account_connected">Connected as %1$s</string>
+    <string name="select_google_account">Select Account for Backup</string>
+    <string name="synchronizing_google_drive">Synchronizing with Google Drive… %1$d%%</string>
+
+    <!-- Delete Confirmation Dialog -->
+    <string name="delete_confirm_title">Delete note?</string>
+    <string name="delete_confirm_msg">Are you sure you want to move this note to the trash? Notes inside the trash can be restored later.</string>
+    <string name="delete_confirm_title_permanent">Delete permanently?</string>
+    <string name="delete_confirm_msg_permanent">Are you sure you want to delete this note permanently? This action cannot be undone.</string>
+    <string name="delete_confirm_delete">Delete</string>
+    <string name="delete_confirm_cancel">Cancel</string>
+</resources>

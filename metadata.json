@@ -1,0 +1,6 @@
+{
+  "name": "Keeper",
+  "description": "A Google Keep clone with rich note capture supporting images, videos, audio, file uploads, pinning, checklist items, custom colors, animations, archive, search, and settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
