@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ fun SettingsView(
     val isGridView by viewModel.isGridView.collectAsState()
     val defaultColorHex by viewModel.defaultNoteColor.collectAsState()
     val userName by viewModel.userName.collectAsState()
+    val context = LocalContext.current
 
     // Google integration collections
     val isGoogleConnected by viewModel.isGoogleConnected.collectAsState()
