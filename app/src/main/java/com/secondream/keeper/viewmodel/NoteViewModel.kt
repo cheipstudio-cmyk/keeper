@@ -173,6 +173,20 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit().putString("user_name", name).apply()
     }
 
+    /**
+     * Convert a Google account email like "eugenio.casale@gmail.com" into a
+     * presentable display name "Eugenio Casale". Falls back to the local part
+     * unchanged if it has no separators.
+     */
+    private fun deriveDisplayNameFromEmail(email: String): String {
+        val local = email.substringBefore("@").trim()
+        if (local.isBlank()) return ""
+        val parts = local.split(".", "_", "-", "+")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        return parts.joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+    }
+
     // Google Cloud Sync States
     private val _isGoogleConnected = MutableStateFlow(prefs.getBoolean("google_connected", false))
     val isGoogleConnected = _isGoogleConnected.asStateFlow()
@@ -266,6 +280,13 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                         .apply()
                     // First successful login completes onboarding
                     completeOnboarding()
+                    // Derive user name from email when it's still the default "Explorer"
+                    if (_userName.value == "Explorer" || _userName.value.isBlank()) {
+                        val derived = deriveDisplayNameFromEmail(email)
+                        if (derived.isNotBlank()) {
+                            setUserName(derived)
+                        }
+                    }
                     _syncMessage.value = "Connesso. Cartella Keeper pronta su Drive."
 
                     // Auto-import existing notes from Drive (covers the case

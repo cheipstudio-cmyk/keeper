@@ -589,17 +589,20 @@ fun NoteItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
             .border(
-                width = 1.6.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(20.dp)
+                width = 1.dp,
+                color = borderColor.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(24.dp)
             )
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = cardBackground),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 6.dp
+        )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             // Card visual image highlights
             val firstImg = attachments.find { it.type == "image" }
             if (firstImg != null) {

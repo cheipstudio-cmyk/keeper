@@ -222,18 +222,18 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
         String.format("%d:%02d", minutes, seconds)
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
+            .systemBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // VIDEO area — fills the screen with bottom padding reserved for controls
-        // (220dp accounts for: title + size text + slider + spacer + 72dp FAB row + paddings)
+        // VIDEO area — takes all remaining vertical space, no more no less
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 220.dp, top = 56.dp)
-                .padding(horizontal = 16.dp),
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(top = 56.dp, start = 12.dp, end = 12.dp, bottom = 12.dp),
             contentAlignment = Alignment.Center
         ) {
             if (isError) {
@@ -272,29 +272,28 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
             }
         }
 
-        // CONTROLS row — always anchored to bottom, never clipped
+        // CONTROLS — natural height, always below the video, never clipped
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.55f))
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = attachment.name,
                 color = Color.White,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
             Text(
                 text = "Video • ${attachment.size}",
                 color = Color.LightGray,
-                fontSize = 12.sp
+                fontSize = 11.sp
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Slider with timestamps
             Row(
@@ -333,7 +332,7 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Restart + Play/Pause row
             Row(
@@ -347,7 +346,7 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
                         currentPosition = 0L
                     },
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(48.dp)
                         .background(Color.White.copy(alpha = 0.18f), CircleShape)
                 ) {
                     Icon(
@@ -357,7 +356,7 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
                     )
                 }
 
-                Spacer(modifier = Modifier.width(24.dp))
+                Spacer(modifier = Modifier.width(20.dp))
 
                 FloatingActionButton(
                     onClick = {
@@ -366,12 +365,12 @@ fun SimulatedVideoView(attachment: Attachment, onDismiss: () -> Unit) {
                     containerColor = Color(0xFFFFCA28),
                     contentColor = Color.Black,
                     shape = CircleShape,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(58.dp)
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pausa" else "Riproduci",
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(30.dp)
                     )
                 }
             }

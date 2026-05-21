@@ -14,6 +14,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
@@ -21,6 +23,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -775,24 +779,77 @@ fun NoteDetailView(
                                 // Render dynamic editable checklist list
                                 Column {
                                     checklistItems.forEachIndexed { idx, item ->
+                                        // Material 3 Expressive style row: pill background, animated check,
+                                        // strike-through on the text with subtle fade
+                                        val rowBg by animateColorAsState(
+                                            targetValue = if (item.checked)
+                                                contentColor.copy(alpha = 0.06f)
+                                            else
+                                                contentColor.copy(alpha = 0.10f),
+                                            animationSpec = tween(220),
+                                            label = "checklist_row_bg"
+                                        )
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(vertical = 0.dp),
+                                                .padding(vertical = 3.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(rowBg)
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Checkbox(
-                                                checked = item.checked,
-                                                onCheckedChange = { checked ->
-                                                    checklistItems = checklistItems.mapIndexed { i, it ->
-                                                        if (i == idx) it.copy(checked = checked) else it
-                                                    }
-                                                },
-                                                colors = CheckboxDefaults.colors(
-                                                    checkedColor = Color(0xFFF57C00),
-                                                    checkmarkColor = Color.White
-                                                )
+                                            // Custom circular check button (Pixel/Keep style, much
+                                            // bigger and more tappable than default Checkbox)
+                                            val tickScale by animateFloatAsState(
+                                                targetValue = if (item.checked) 1f else 0f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                    stiffness = Spring.StiffnessMedium
+                                                ),
+                                                label = "tick_scale"
                                             )
+                                            val tickContainerColor by animateColorAsState(
+                                                targetValue = if (item.checked)
+                                                    Color(0xFFFFCA28)
+                                                else
+                                                    Color.Transparent,
+                                                animationSpec = tween(220),
+                                                label = "tick_container"
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(start = 4.dp)
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(tickContainerColor)
+                                                    .border(
+                                                        width = if (item.checked) 0.dp else 1.6.dp,
+                                                        color = contentColor.copy(alpha = 0.55f),
+                                                        shape = CircleShape
+                                                    )
+                                                    .clickable {
+                                                        checklistItems = checklistItems.mapIndexed { i, it ->
+                                                            if (i == idx) it.copy(checked = !it.checked) else it
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF1A1A1A),
+                                                    modifier = Modifier
+                                                        .size(20.dp)
+                                                        .graphicsLayer {
+                                                            scaleX = tickScale
+                                                            scaleY = tickScale
+                                                            alpha = tickScale
+                                                        }
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(10.dp))
+
                                             TextField(
                                                 value = item.text,
                                                 onValueChange = { newTxt ->
@@ -801,9 +858,10 @@ fun NoteDetailView(
                                                     }
                                                 },
                                                 textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                                    fontSize = 14.sp,
+                                                    fontSize = 15.sp,
+                                                    fontWeight = if (item.checked) FontWeight.Normal else FontWeight.Medium,
                                                     textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                                                    color = if (item.checked) contentColor.copy(alpha = 0.5f) else contentColor
+                                                    color = if (item.checked) contentColor.copy(alpha = 0.45f) else contentColor
                                                 ),
                                                 colors = TextFieldDefaults.colors(
                                                     focusedContainerColor = Color.Transparent,
@@ -816,13 +874,17 @@ fun NoteDetailView(
                                                 ),
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            IconButton(onClick = {
-                                                checklistItems = checklistItems.filterIndexed { i, _ -> i != idx }
-                                            }) {
+                                            IconButton(
+                                                onClick = {
+                                                    checklistItems = checklistItems.filterIndexed { i, _ -> i != idx }
+                                                },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Close,
                                                     contentDescription = "Delete item",
-                                                    tint = contentColor.copy(alpha = 0.6f)
+                                                    tint = contentColor.copy(alpha = 0.45f),
+                                                    modifier = Modifier.size(18.dp)
                                                 )
                                             }
                                         }

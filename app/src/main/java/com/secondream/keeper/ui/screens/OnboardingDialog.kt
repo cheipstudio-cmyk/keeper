@@ -6,8 +6,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
@@ -73,14 +75,16 @@ fun OnboardingDialog(
                 .fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
+            val scrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .systemBarsPadding()
-                    .padding(horizontal = 28.dp, vertical = 24.dp),
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 28.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.weight(0.5f))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Animated icon
                 val infiniteTransition = rememberInfiniteTransition(label = "icon_anim")
@@ -96,7 +100,7 @@ fun OnboardingDialog(
 
                 Box(
                     modifier = Modifier
-                        .size(120.dp)
+                        .size(110.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFFFCA28)),
                     contentAlignment = Alignment.Center
@@ -105,31 +109,31 @@ fun OnboardingDialog(
                         imageVector = Icons.Default.NoteAdd,
                         contentDescription = null,
                         tint = Color(0xFF1A1A1A),
-                        modifier = Modifier.size((60 * scale).dp)
+                        modifier = Modifier.size((54 * scale).dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
                     text = stringResource(R.string.onboarding_welcome_title),
-                    fontSize = 26.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
                     text = stringResource(R.string.onboarding_welcome_subtitle),
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
+                    lineHeight = 20.sp
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Feature bullets
                 Column(
@@ -137,8 +141,8 @@ fun OnboardingDialog(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     FeatureBullet(
                         icon = Icons.Default.CloudUpload,
@@ -157,7 +161,7 @@ fun OnboardingDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Primary action
                 Button(
@@ -178,7 +182,7 @@ fun OnboardingDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Secondary (skip)
                 TextButton(
@@ -192,7 +196,7 @@ fun OnboardingDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
