@@ -64,6 +64,8 @@ fun SettingsView(
     var lastBackupTime by remember(neverBackupStr) { mutableStateOf(neverBackupStr) }
 
     var showAccountChooser by remember { mutableStateOf(false) }
+    // Note: showAccountChooser is now unused (fake chooser removed), kept as
+    // a placeholder for future re-introduction of an in-app picker.
     var isConnectingGoogle by remember { mutableStateOf(false) }
     var customEmailInput by remember { mutableStateOf("") }
 
@@ -94,7 +96,12 @@ fun SettingsView(
             )
             accountChooserLauncher.launch(intent)
         } catch (e: Exception) {
-            showAccountChooser = true
+            e.printStackTrace()
+            android.widget.Toast.makeText(
+                context,
+                "Impossibile aprire il selettore account",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -332,14 +339,11 @@ fun SettingsView(
                 )
 
                 if (isGoogleConnected) {
-                    // Dynamic account details based on email
-                    val (dispName, initial, avatarColor) = when {
-                        googleEmail.contains("work", ignoreCase = true) -> Triple("Casale Work & Dev", "C", Color(0xFF4285F4))
-                        googleEmail.contains("personal", ignoreCase = true) -> Triple("Eugenio Personal", "E", Color(0xFF34A853))
-                        else -> Triple("Eugenio Casale", "E", Color(0xFFEA4335))
-                    }
+                    // Derive avatar initial from the email itself — no more
+                    // hardcoded "Eugenio Casale" fallback that hijacked the UI.
+                    val initial = googleEmail.firstOrNull()?.uppercase() ?: "?"
+                    val avatarColor = MaterialTheme.colorScheme.primary
 
-                    // Connected User Details Card Layout (Stacked cleanly on small screens)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -354,7 +358,7 @@ fun SettingsView(
                             ) {
                                 Text(
                                     text = initial,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 18.sp
                                 )
@@ -362,21 +366,16 @@ fun SettingsView(
 
                             Spacer(modifier = Modifier.width(12.dp))
 
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = dispName,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = googleEmail,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                            }
+                            // Just the email, no fake display name
+                            Text(
+                                text = googleEmail,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -735,129 +734,7 @@ fun SettingsView(
         Spacer(modifier = Modifier.height(100.dp))
     }
 
-    // Google Account Chooser sheets / popup dialogue
-    if (showAccountChooser) {
-        AlertDialog(
-            onDismissRequest = { showAccountChooser = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.select_google_account),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        text = "Seleziona uno dei tuoi account per avviare il caricamento e la sincronizzazione con il server cloud:",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-
-                    // 1. BACKUP PRE-FILLED QUICK CHOICES
-                    val quickAccounts = listOf(
-                        Triple("Eugenio Casale", "EugenioCasale@gmail.com", Color(0xFFEA4335)),
-                        Triple("Casale Work & Dev", "work.casale@gmail.com", Color(0xFF4285F4))
-                    )
-
-                    quickAccounts.forEach { (name, email, color) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                .clickable {
-                                    showAccountChooser = false
-                                    viewModel.connectAndSyncGoogleAccount(email)
-                                }
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(color),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(name, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                                Text(email, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    // 3. SECURE CUSTOM USER EMAIL MANUAL INPUT
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Aggiungi altro account personalizzato:",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        OutlinedTextField(
-                            value = customEmailInput,
-                            onValueChange = { customEmailInput = it },
-                            placeholder = { Text("esempio@gmail.com", fontSize = 13.sp) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                            ),
-                            trailingIcon = {
-                                if (customEmailInput.isNotBlank() && customEmailInput.contains("@")) {
-                                    IconButton(
-                                        onClick = {
-                                            val enteredEmail = customEmailInput.trim()
-                                            customEmailInput = ""
-                                            showAccountChooser = false
-                                            viewModel.connectAndSyncGoogleAccount(enteredEmail)
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.CheckCircle,
-                                            contentDescription = "Confirm customized email",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        customEmailInput = ""
-                        showAccountChooser = false
-                    }
-                ) {
-                    Text(stringResource(R.string.delete_confirm_cancel), fontWeight = FontWeight.Bold)
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
-    }
+    // Fake account chooser removed — use the real system picker only.
 
     // Beautiful dynamic Cloud Sync Full-Screen dialog state
     if (isSyncingNotes) {

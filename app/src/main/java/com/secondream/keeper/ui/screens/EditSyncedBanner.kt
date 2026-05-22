@@ -48,14 +48,14 @@ fun EditSyncedBanner(viewModel: NoteViewModel, modifier: Modifier = Modifier) {
 
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter = fadeIn(animationSpec = androidx.compose.animation.core.tween(120)),
+        exit = fadeOut(animationSpec = androidx.compose.animation.core.tween(180)),
         modifier = modifier
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .widthIn(min = 220.dp, max = 280.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 14.dp, vertical = 10.dp)

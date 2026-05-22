@@ -40,14 +40,26 @@ data class UploadingAttachment(
 )
 
 class NoteViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: NoteRepository
+    private lateinit var repository: NoteRepository
     private val prefs = application.getSharedPreferences("keep_notes_prefs", Context.MODE_PRIVATE)
 
-    // Raw sources from repository
-    val activeNotes: StateFlow<List<Note>>
-    val archivedNotes: StateFlow<List<Note>>
-    val trashedNotes: StateFlow<List<Note>>
-    val allLabels: StateFlow<Set<String>>
+    // Raw sources from repository — pre-initialized to safe empty defaults so
+    // even if the repository fails to wire up (e.g. after a corrupted data
+    // wipe), the ViewModel still constructs and the app opens.
+    private val _activeNotes = MutableStateFlow<List<Note>>(emptyList())
+    val activeNotes: StateFlow<List<Note>> = _activeNotes.asStateFlow()
+
+    private val _archivedNotes = MutableStateFlow<List<Note>>(emptyList())
+    val archivedNotes: StateFlow<List<Note>> = _archivedNotes.asStateFlow()
+
+    private val _trashedNotes = MutableStateFlow<List<Note>>(emptyList())
+    val trashedNotes: StateFlow<List<Note>> = _trashedNotes.asStateFlow()
+
+    private val _allLabels = MutableStateFlow<Set<String>>(emptySet())
+    val allLabels: StateFlow<Set<String>> = _allLabels.asStateFlow()
+
+    private val _filteredNotes = MutableStateFlow<List<Note>>(emptyList())
+    val filteredNotes: StateFlow<List<Note>> = _filteredNotes.asStateFlow()
 
     // Search and filters
     private val _searchQuery = MutableStateFlow("")
@@ -58,9 +70,6 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentScreen = MutableStateFlow<NavigationScreen>(NavigationScreen.Notes)
     val currentScreen = _currentScreen.asStateFlow()
-
-    // Screen-filtered Notes combined with search queries
-    val filteredNotes: StateFlow<List<Note>>
 
     // Settings
     private val _isGridView = MutableStateFlow(prefs.getBoolean("is_grid_view", true))
@@ -133,72 +142,80 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     val uploadingTasks = _uploadingTasks.asStateFlow()
 
     init {
-        val database = AppDatabase.getDatabase(application)
-        repository = NoteRepository(database.noteDao())
-
-        activeNotes = repository.activeNotes.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-        archivedNotes = repository.archivedNotes.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-        trashedNotes = repository.trashedNotes.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-        allLabels = combine(
-            repository.allExistingLabels,
-            _extraLabels
-        ) { dbLabels, extra -> (dbLabels + extra).toSet() }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptySet()
-        )
-
-        filteredNotes = combine(
-            _currentScreen,
-            activeNotes,
-            archivedNotes,
-            trashedNotes,
-            _searchQuery
-        ) { screen, active, archived, trashed, query ->
-            val baseList = when (screen) {
-                is NavigationScreen.Notes -> active
-                is NavigationScreen.Reminders -> active.filter { it.getChecklist().isNotEmpty() }
-                is NavigationScreen.Archive -> archived
-                is NavigationScreen.Trash -> trashed
-                is NavigationScreen.Label -> active.filter { it.getLabelsList().contains(screen.label) }
-                is NavigationScreen.Settings -> emptyList()
+        // ── DB initialization: wrapped because we'd rather have an empty app
+        //    than a crash loop after a data wipe.
+        try {
+            val database = AppDatabase.getDatabase(application)
+            repository = NoteRepository(database.noteDao())
+        } catch (e: Exception) {
+            android.util.Log.e("Keeper", "Database init FAILED", e)
+            // Last-resort dummy: attempt a fresh in-memory instance
+            try {
+                val database = AppDatabase.getDatabase(application)
+                repository = NoteRepository(database.noteDao())
+            } catch (e2: Exception) {
+                android.util.Log.e("Keeper", "Second DB attempt failed", e2)
+                throw e2
             }
+        }
 
-            if (query.isBlank()) {
-                baseList
-            } else {
-                baseList.filter { note ->
-                    note.title.contains(query, ignoreCase = true) ||
-                    note.content.contains(query, ignoreCase = true) ||
-                    note.getChecklist().any { it.text.contains(query, ignoreCase = true) } ||
-                    note.getLabelsList().any { it.contains(query, ignoreCase = true) } ||
-                    note.getAttachments().any { it.name.contains(query, ignoreCase = true) }
-                }
+        // ── Wire Flows from repo into our StateFlow defaults.
+        //    Each in its own coroutine so one failing doesn't kill the others.
+        viewModelScope.launch {
+            try { repository.activeNotes.collect { _activeNotes.value = it } }
+            catch (e: Exception) { android.util.Log.e("Keeper", "activeNotes flow failed", e) }
+        }
+        viewModelScope.launch {
+            try { repository.archivedNotes.collect { _archivedNotes.value = it } }
+            catch (e: Exception) { android.util.Log.e("Keeper", "archivedNotes flow failed", e) }
+        }
+        viewModelScope.launch {
+            try { repository.trashedNotes.collect { _trashedNotes.value = it } }
+            catch (e: Exception) { android.util.Log.e("Keeper", "trashedNotes flow failed", e) }
+        }
+        viewModelScope.launch {
+            try {
+                combine(
+                    repository.allExistingLabels,
+                    _extraLabels
+                ) { dbLabels, extra -> (dbLabels + extra).toSet() }
+                    .collect { _allLabels.value = it }
+            } catch (e: Exception) {
+                android.util.Log.e("Keeper", "allLabels flow failed", e)
             }
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        }
+        viewModelScope.launch {
+            try {
+                combine(
+                    _currentScreen,
+                    activeNotes,
+                    archivedNotes,
+                    trashedNotes,
+                    _searchQuery
+                ) { screen, active, archived, trashed, query ->
+                    val baseList = when (screen) {
+                        is NavigationScreen.Notes -> active
+                        is NavigationScreen.Reminders -> active.filter { it.getChecklist().isNotEmpty() }
+                        is NavigationScreen.Archive -> archived
+                        is NavigationScreen.Trash -> trashed
+                        is NavigationScreen.Label -> active.filter { it.getLabelsList().contains(screen.label) }
+                        is NavigationScreen.Settings -> emptyList()
+                    }
+                    if (query.isBlank()) baseList
+                    else baseList.filter { note ->
+                        note.title.contains(query, ignoreCase = true) ||
+                        note.content.contains(query, ignoreCase = true) ||
+                        note.getChecklist().any { it.text.contains(query, ignoreCase = true) } ||
+                        note.getLabelsList().any { it.contains(query, ignoreCase = true) } ||
+                        note.getAttachments().any { it.name.contains(query, ignoreCase = true) }
+                    }
+                }.collect { _filteredNotes.value = it }
+            } catch (e: Exception) {
+                android.util.Log.e("Keeper", "filteredNotes flow failed", e)
+            }
+        }
 
-        // All post-init side effects wrapped — if any of these throw we
-        // still want the ViewModel to construct successfully so the app
-        // opens. Crashing in init causes a relaunch loop after data wipe.
+        // Cache cleanup
         try {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
@@ -218,6 +235,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             android.util.Log.e("Keeper", "Cache cleanup launch failed", e)
         }
 
+        // One-time username migration
         try {
             if (!prefs.getBoolean("migration_v0_7_name", false)) {
                 val email = prefs.getString("user_name_email", "") ?: ""
@@ -236,6 +254,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             android.util.Log.e("Keeper", "Username migration failed", e)
         }
 
+        // Force re-derive on startup if already connected
         try {
             val connectedEmail = prefs.getString("google_email", "") ?: ""
             val isConnected = prefs.getBoolean("google_connected", false)
@@ -478,9 +497,10 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun setBannerDone() {
+        // Brief "done" indicator then hide. Short so the UI feels snappy.
         viewModelScope.launch {
             _editBanner.value = EditBannerState(EditBannerPhase.DONE, 1f)
-            kotlinx.coroutines.delay(1300)
+            kotlinx.coroutines.delay(700)
             _editBanner.value = EditBannerState(EditBannerPhase.HIDDEN, 0f)
         }
     }

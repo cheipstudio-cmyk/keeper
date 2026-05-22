@@ -93,7 +93,9 @@ fun MyApplicationTheme(
         )
       } else {
         baseScheme.copy(
-          primaryContainer = accentColor.copy(alpha = 0.85f),
+          primary = accentColor,
+          primaryContainer = accentColor,
+          onPrimary = Color(0xFF1A1A1A),
           onPrimaryContainer = Color(0xFF1A1A1A)
         )
       }
