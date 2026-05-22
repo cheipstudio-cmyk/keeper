@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -431,6 +432,19 @@ fun NoteApp(viewModel: NoteViewModel) {
             },
             floatingActionButton = {
                 if (currentScreen is NavigationScreen.Notes) {
+                    var fabAppeared by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(160)
+                        fabAppeared = true
+                    }
+                    val fabScale by animateFloatAsState(
+                        targetValue = if (fabAppeared) 1f else 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "fab_intro"
+                    )
                     FloatingActionButton(
                         onClick = { isCreatingNewNote = true },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -443,6 +457,10 @@ fun NoteApp(viewModel: NoteViewModel) {
                         modifier = Modifier
                             .navigationBarsPadding()
                             .size(58.dp)
+                            .graphicsLayer {
+                                scaleX = fabScale
+                                scaleY = fabScale
+                            }
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Add,
@@ -792,6 +810,20 @@ fun NoteItemCard(
     onTrashClick: () -> Unit,
     onArchiveClick: () -> Unit
 ) {
+    // Soft fade + scale-in when the card first enters composition.
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val entryAlpha by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0f,
+        animationSpec = tween(durationMillis = 280, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "card_entry_alpha"
+    )
+    val entryScale by animateFloatAsState(
+        targetValue = if (appeared) 1f else 0.94f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "card_entry_scale"
+    )
+
     val cardBackground by animateColorAsState(
         targetValue = KeepColors.getColorForHex(note.colorHex, themeIsDark),
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -814,6 +846,11 @@ fun NoteItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                alpha = entryAlpha
+                scaleX = entryScale
+                scaleY = entryScale
+            }
             .clip(RoundedCornerShape(24.dp))
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = cardBackground),
@@ -1017,13 +1054,49 @@ fun NoteItemCard(
 @Composable
 fun EmptyStateView(screen: NavigationScreen) {
     val info = when (screen) {
-        is NavigationScreen.Notes -> Pair(Icons.Outlined.Lightbulb, stringResource(R.string.empty_notes))
-        is NavigationScreen.Reminders -> Pair(Icons.Outlined.Checklist, stringResource(R.string.empty_reminders))
-        is NavigationScreen.Archive -> Pair(Icons.Outlined.Archive, stringResource(R.string.empty_archive))
-        is NavigationScreen.Trash -> Pair(Icons.Outlined.Delete, stringResource(R.string.empty_trash))
-        is NavigationScreen.Label -> Pair(Icons.Outlined.Label, stringResource(R.string.empty_label))
-        is NavigationScreen.Settings -> Pair(Icons.Outlined.Settings, stringResource(R.string.empty_settings))
+        is NavigationScreen.Notes -> Triple(
+            Icons.Outlined.Lightbulb,
+            stringResource(R.string.empty_notes),
+            "Tocca + per crearne una"
+        )
+        is NavigationScreen.Reminders -> Triple(
+            Icons.Outlined.Checklist,
+            stringResource(R.string.empty_reminders),
+            "Le tue checklist appariranno qui"
+        )
+        is NavigationScreen.Archive -> Triple(
+            Icons.Outlined.Archive,
+            stringResource(R.string.empty_archive),
+            "Le note archiviate verranno raccolte qui"
+        )
+        is NavigationScreen.Trash -> Triple(
+            Icons.Outlined.Delete,
+            stringResource(R.string.empty_trash),
+            "Le note eliminate restano per 30 giorni"
+        )
+        is NavigationScreen.Label -> Triple(
+            Icons.Outlined.Label,
+            stringResource(R.string.empty_label),
+            "Aggiungi questa etichetta alle tue note"
+        )
+        is NavigationScreen.Settings -> Triple(
+            Icons.Outlined.Settings,
+            stringResource(R.string.empty_settings),
+            ""
+        )
     }
+
+    // Subtle breathing pulse on the icon
+    val infiniteTransition = rememberInfiniteTransition(label = "empty-pulse")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
 
     Column(
         modifier = Modifier
@@ -1032,19 +1105,42 @@ fun EmptyStateView(screen: NavigationScreen) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = info.first,
-            contentDescription = "Empty notes state icon",
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-            modifier = Modifier.size(80.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .background(
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = info.first,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(56.dp)
+                    .graphicsLayer {
+                        scaleX = pulse
+                        scaleY = pulse
+                    }
+            )
+        }
+        Spacer(modifier = Modifier.height(20.dp))
         Text(
             text = info.second,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-            fontSize = 16.sp
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+            fontSize = 17.sp
         )
+        if (info.third.isNotBlank()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = info.third,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+                fontSize = 13.sp
+            )
+        }
     }
 }
 

@@ -14,8 +14,8 @@ android {
     applicationId = "com.secondream.keeper"
     minSdk = 24
     targetSdk = 36
-    versionCode = 27
-    versionName = "0.9.4"
+    versionCode = 30
+    versionName = "0.9.7"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -103,6 +103,7 @@ dependencies {
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   implementation("androidx.biometric:biometric:1.1.0")
+  implementation("androidx.core:core-splashscreen:1.0.1")
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)

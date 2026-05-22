@@ -26,6 +26,10 @@ class MainActivity : FragmentActivity() {
     private val viewModel: NoteViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install the modern splash screen API. This shows the launcher icon
+        // on the dark blue brand color while the first frame is being
+        // prepared, then automatically fades into the app.
+        androidx.core.splashscreen.SplashScreen.installSplashScreen(this)
         super.onCreate(savedInstanceState)
         android.util.Log.i("KeeperLifecycle", "MainActivity.onCreate START")
 
@@ -99,6 +103,7 @@ class MainActivity : FragmentActivity() {
             LaunchedEffect(pendingAuthIntent) {
                 pendingAuthIntent?.let { intent ->
                     try {
+                        viewModel.markSystemPickerAboutToOpen()
                         authLauncher.launch(intent)
                     } catch (e: Exception) {
                         e.printStackTrace()
