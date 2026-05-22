@@ -570,7 +570,7 @@ fun NoteDetailView(
                             ToolbarChip(
                                 icon = Icons.Outlined.Delete,
                                 tint = accentChipColor,
-                                contentDescription = stringResource(R.string.delete_tooltip),
+                                contentDescription = stringResource(R.string.trash_tooltip),
                                 onClick = { showDeleteConfirm = true }
                             )
 
