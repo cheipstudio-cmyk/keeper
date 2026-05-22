@@ -1058,91 +1058,128 @@ fun NoteDetailView(
                         }
                     }
 
-                    // Direct Labels Input Bar
+                    // Tag picker — pick from existing labels only. If none
+                    // exist, show a "+ Create" button that opens the same
+                    // creation dialog used in the side drawer.
                     if (showLabelPicker) {
+                        val allLabels by viewModel.allLabels.collectAsState()
+                        var showCreateTagDialog by remember { mutableStateOf(false) }
+                        val currentLabels = labelsCSV.split(",")
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                            .toSet()
+
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedTextField(
-                                value = labelsCSV,
-                                onValueChange = { labelsCSV = it },
-                                label = { Text(stringResource(R.string.add_tags_label)) },
-                                placeholder = { Text("Esempio: Spesa, Lavoro, Idee") },
-                                supportingText = { Text("Inserisci le etichette separate da virgole", fontSize = 11.sp, color = contentColor.copy(alpha = 0.6f)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = contentColor,
-                                    unfocusedBorderColor = contentColor.copy(alpha = 0.3f),
-                                    focusedTextColor = contentColor,
-                                    unfocusedTextColor = contentColor,
-                                    focusedLabelColor = contentColor,
-                                    unfocusedLabelColor = contentColor.copy(alpha = 0.6f),
-                                    focusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
-                                    unfocusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
-                                    cursorColor = contentColor
-                                )
-                            )
-
-                            // Quick tag chips suggestions
-                            val quickSuggestionSet = listOf("Personale", "Lavoro", "Idee", "Viaggi", "Sincronizzato", "Cloud")
-                            val currentLabels = labelsCSV.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-
                             Text(
-                                text = "Tocca un tag rapido per aggiungerlo o rimuoverlo:",
+                                text = "Etichette",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = contentColor.copy(alpha = 0.6f)
                             )
 
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                quickSuggestionSet.forEach { quickTag ->
-                                    val isTagged = currentLabels.any { it.equals(quickTag, ignoreCase = true) }
-                                    val chipBg = if (isTagged) contentColor.copy(alpha = 0.12f) else Color.Transparent
-                                    val chipBorderColor = if (isTagged) contentColor else contentColor.copy(alpha = 0.25f)
-
+                            if (allLabels.isEmpty()) {
+                                // No tags yet — show only a Create button
+                                Button(
+                                    onClick = { showCreateTagDialog = true },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = contentColor.copy(alpha = 0.12f),
+                                        contentColor = contentColor
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Crea etichetta", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    allLabels.sorted().forEach { tag ->
+                                        val isTagged = currentLabels.any { it.equals(tag, ignoreCase = true) }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(
+                                                    if (isTagged) contentColor.copy(alpha = 0.16f)
+                                                    else Color.Transparent
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (isTagged) contentColor
+                                                    else contentColor.copy(alpha = 0.25f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable {
+                                                    val list = labelsCSV.split(",")
+                                                        .map { it.trim() }
+                                                        .filter { it.isNotEmpty() }
+                                                        .toMutableList()
+                                                    if (isTagged) {
+                                                        list.removeAll { it.equals(tag, ignoreCase = true) }
+                                                    } else {
+                                                        list.add(tag)
+                                                    }
+                                                    labelsCSV = list.joinToString(", ")
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                if (isTagged) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = contentColor,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = tag,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = contentColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                    // Always show "+ Create" chip at the end
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(chipBg)
-                                            .border(1.dp, chipBorderColor, RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                if (isTagged) {
-                                                    // Case-insensitive removal
-                                                    labelsCSV = currentLabels
-                                                        .filter { !it.equals(quickTag, ignoreCase = true) }
-                                                        .joinToString(", ")
-                                                } else {
-                                                    // Add
-                                                    labelsCSV = if (labelsCSV.trim().isBlank()) {
-                                                        quickTag
-                                                    } else {
-                                                        "${labelsCSV.trim().removeSuffix(",")}, $quickTag"
-                                                    }
-                                                }
-                                            }
+                                            .border(
+                                                1.dp,
+                                                contentColor.copy(alpha = 0.4f),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { showCreateTagDialog = true }
                                             .padding(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            if (isTagged) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = "Active tag indicator",
-                                                    tint = contentColor,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = null,
+                                                tint = contentColor,
+                                                modifier = Modifier.size(12.dp)
+                                            )
                                             Text(
-                                                text = quickTag,
+                                                text = "Crea",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = contentColor
@@ -1151,6 +1188,51 @@ fun NoteDetailView(
                                     }
                                 }
                             }
+                        }
+
+                        if (showCreateTagDialog) {
+                            var newTagName by remember { mutableStateOf("") }
+                            AlertDialog(
+                                onDismissRequest = { showCreateTagDialog = false },
+                                title = { Text("Nuova etichetta", fontWeight = FontWeight.Bold) },
+                                text = {
+                                    OutlinedTextField(
+                                        value = newTagName,
+                                        onValueChange = { newTagName = it },
+                                        placeholder = { Text("Nome etichetta") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            val trimmed = newTagName.trim()
+                                            if (trimmed.isNotEmpty()) {
+                                                viewModel.createEmptyLabel(trimmed)
+                                                // also apply to this note
+                                                val list = labelsCSV.split(",")
+                                                    .map { it.trim() }
+                                                    .filter { it.isNotEmpty() }
+                                                    .toMutableList()
+                                                if (list.none { it.equals(trimmed, ignoreCase = true) }) {
+                                                    list.add(trimmed)
+                                                }
+                                                labelsCSV = list.joinToString(", ")
+                                            }
+                                            showCreateTagDialog = false
+                                        },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) { Text("Crea", fontWeight = FontWeight.Bold) }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showCreateTagDialog = false }) {
+                                        Text("Annulla")
+                                    }
+                                },
+                                shape = RoundedCornerShape(22.dp)
+                            )
                         }
                     } else if (labelsCSV.isNotBlank()) {
                         FlowRow(

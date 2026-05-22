@@ -22,8 +22,10 @@ object NetworkObserver {
             ?: return false
         val active = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(active) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        // INTERNET capability is enough — VALIDATED can lag behind real
+        // connectivity (e.g. just after a reconnect) and showed the offline
+        // banner falsely even when the device was actually online.
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     fun observe(context: Context): Flow<Boolean> = callbackFlow {

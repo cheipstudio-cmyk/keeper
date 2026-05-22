@@ -134,7 +134,19 @@ fun OfflineBanner(
 ) {
     val isOnline by viewModel.isOnline.collectAsState()
     val isGoogleConnected by viewModel.isGoogleConnected.collectAsState()
-    val visible = !isOnline && isGoogleConnected
+    // Debounce the offline state: only consider us "offline" if we've been
+    // off for at least 1.5s. This kills flicker from quick capability changes
+    // (e.g. switching between wifi and cellular).
+    var debouncedOffline by remember { mutableStateOf(false) }
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            debouncedOffline = false
+        } else {
+            kotlinx.coroutines.delay(1500)
+            if (!viewModel.isOnline.value) debouncedOffline = true
+        }
+    }
+    val visible = debouncedOffline && isGoogleConnected
 
     AnimatedVisibility(
         visible = visible,

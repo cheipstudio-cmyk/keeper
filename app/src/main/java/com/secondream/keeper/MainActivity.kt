@@ -150,6 +150,11 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshNetworkState()
+    }
+
     override fun onStop() {
         super.onStop()
         // Re-lock whenever the app goes to background (if lock is enabled)

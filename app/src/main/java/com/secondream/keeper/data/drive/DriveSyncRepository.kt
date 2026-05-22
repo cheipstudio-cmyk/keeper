@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.secondream.keeper.data.model.Attachment
 import com.secondream.keeper.data.model.Note
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -51,7 +53,8 @@ class DriveSyncRepository(
         accountName: String,
         note: Note,
         rootFolderId: String,
-        progressListener: UploadProgressListener? = null
+        progressListener: UploadProgressListener? = null,
+        onFolderEnsured: (suspend (String) -> Unit)? = null
     ): SyncOutcome {
         val folderName = noteFolderName(note)
         val ensure = drive.ensureNoteFolder(
@@ -65,6 +68,10 @@ class DriveSyncRepository(
             is DriveSync.Result.NeedsUserAction -> return SyncOutcome.NeedsUserAction(ensure.intent)
             is DriveSync.Result.Error -> return SyncOutcome.Failure(ensure.message)
         }
+        // Persist folderId IMMEDIATELY so a subsequent retry never creates a
+        // second folder for the same note on Drive (the previous behavior
+        // could create duplicate folders if upload failed mid-way).
+        onFolderEnsured?.invoke(folderId)
 
         // 1. Upload note.json
         val attachments = note.getAttachments()
@@ -92,13 +99,31 @@ class DriveSyncRepository(
             val mimeType = mimeTypeFor(att)
             val totalBytes = localFile.length()
             progressListener?.onProgress(att.name, 0L, totalBytes)
-            val uploadResult = drive.uploadAttachment(
-                accountName = accountName,
-                parentFolderId = folderId,
-                file = localFile,
-                targetFileName = driveFileName,
-                mimeType = mimeType
-            )
+
+            // Simulated progress pulse: the underlying upload is blocking
+            // and emits no intermediate progress. We fake a smooth ramp up
+            // to 95% so the banner doesn't sit at 0% then jump to 100%.
+            val uploadResult = kotlinx.coroutines.coroutineScope {
+                val pulseJob = launch {
+                    var fake = 0L
+                    val cap = (totalBytes * 0.95).toLong()
+                    val step = (totalBytes / 40).coerceAtLeast(1024L)
+                    while (isActive && fake < cap) {
+                        kotlinx.coroutines.delay(120)
+                        fake = (fake + step).coerceAtMost(cap)
+                        progressListener?.onProgress(att.name, fake, totalBytes)
+                    }
+                }
+                val r = drive.uploadAttachment(
+                    accountName = accountName,
+                    parentFolderId = folderId,
+                    file = localFile,
+                    targetFileName = driveFileName,
+                    mimeType = mimeType
+                )
+                pulseJob.cancel()
+                r
+            }
             when (uploadResult) {
                 is DriveSync.Result.Success -> {
                     progressListener?.onProgress(att.name, totalBytes, totalBytes)

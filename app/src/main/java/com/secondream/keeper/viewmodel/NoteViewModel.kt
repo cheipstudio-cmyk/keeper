@@ -326,7 +326,13 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (pending.isNotEmpty()) {
                         android.util.Log.i("Keeper", "Recovery upload: ${pending.size} pending notes")
-                        pending.forEach { note -> maybeAutoUploadNote(note.id) }
+                        // Surface the banner immediately so the user knows
+                        // their previous upload is resuming.
+                        _editBanner.value = EditBannerState(EditBannerPhase.SYNCING, 0f)
+                        pending.forEach { note ->
+                            markNoteEditedForBanner(note.id)
+                            maybeAutoUploadNote(note.id)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -353,6 +359,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     fun setDarkThemeOption(option: String) {
         _darkThemeOption.value = option
         prefs.edit().putString("dark_theme", option).apply()
+        refreshWidgets()
     }
 
     fun setDefaultNoteColor(hex: String) {
@@ -428,14 +435,31 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _onboardingCompleted = MutableStateFlow(prefs.getBoolean("onboarding_completed", false))
     val onboardingCompleted = _onboardingCompleted.asStateFlow()
 
-    // Live network status (true = device has internet)
-    val isOnline: StateFlow<Boolean> = com.secondream.keeper.util.NetworkObserver
-        .observe(application.applicationContext)
+    // Live network status (true = device has internet). Eagerly started so
+    // it never goes stale when the app is in background and emits the real
+    // status the moment we come back to foreground.
+    private val _isOnlineOverride = MutableStateFlow<Boolean?>(null)
+    val isOnline: StateFlow<Boolean> = kotlinx.coroutines.flow.combine(
+        com.secondream.keeper.util.NetworkObserver.observe(application.applicationContext),
+        _isOnlineOverride
+    ) { fromFlow, override -> override ?: fromFlow }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Eagerly,
             initialValue = com.secondream.keeper.util.NetworkObserver.isCurrentlyOnline(application.applicationContext)
         )
+
+    /** Force a fresh sync check (e.g. on Activity resume). */
+    fun refreshNetworkState() {
+        val real = com.secondream.keeper.util.NetworkObserver
+            .isCurrentlyOnline(getApplication<Application>().applicationContext)
+        _isOnlineOverride.value = real
+        // Drop the override shortly after so the flow takes back over
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(800)
+            _isOnlineOverride.value = null
+        }
+    }
 
     fun completeOnboarding() {
         _onboardingCompleted.value = true
@@ -559,6 +583,12 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     internal fun markNoteEditedForBanner(noteId: Long) {
         pendingBannerNotes.add(noteId)
+        // Show the banner INSTANTLY (progress 0) when the user closes/edits
+        // a note. Only if auto-upload is on — otherwise nothing will sync
+        // and showing a banner would be misleading.
+        if (_isGoogleConnected.value && _autoUploadEnabled.value && isOnline.value) {
+            _editBanner.value = EditBannerState(EditBannerPhase.SYNCING, 0f)
+        }
     }
 
     private fun setBannerSyncing(progress: Float) {
@@ -976,8 +1006,27 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                         accountName = email,
                         note = note,
                         rootFolderId = rootId,
+                        onFolderEnsured = { folderId ->
+                            // Save the Drive folderId locally as soon as it
+                            // exists, so a failed/retried upload never creates
+                            // a second folder.
+                            if (note.driveFolderId != folderId) {
+                                repository.updateDriveFolder(
+                                    note.id, folderId, note.driveSyncedAt
+                                )
+                            }
+                        },
                         progressListener = { fileName, uploaded, total ->
-                            // Don't show progress for tiny note.json
+                            // For tiny payloads (the note.json itself) we still
+                            // want the banner to advance smoothly, so always
+                            // pump banner progress when this note is flagged
+                            // as user-edited.
+                            if (pendingBannerNotes.contains(note.id) && total > 0) {
+                                val p = (uploaded.toFloat() / total).coerceIn(0f, 1f)
+                                setBannerSyncing(p)
+                            }
+                            // The detailed upload card (with bytes / file name)
+                            // is only useful for large files; keep its threshold.
                             if (total > 50_000L) {
                                 setUploadProgress(
                                     UploadProgress(
@@ -989,12 +1038,6 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                                         isPaused = _pausedNotes.value.contains(note.id)
                                     )
                                 )
-                                // Drive banner progress from real bytes if this
-                                // note was flagged as user-edited.
-                                if (pendingBannerNotes.contains(note.id) && total > 0) {
-                                    val p = (uploaded.toFloat() / total).coerceIn(0f, 1f)
-                                    setBannerSyncing(p)
-                                }
                             }
                         }
                     )
