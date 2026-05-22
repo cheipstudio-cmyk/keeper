@@ -308,7 +308,10 @@ fun NoteApp(viewModel: NoteViewModel) {
                 // Show bottom edit drawer trigger bar only on notes screen to resemble Keep's bottom bar perfectly
                 if (currentScreen is NavigationScreen.Notes) {
                     val activeNotesList by viewModel.activeNotes.collectAsState(emptyList())
-                    BottomAppBar(
+                    Column {
+                        // Short banner shown briefly after a successful auto-sync
+                        EditSyncedBanner(viewModel = viewModel)
+                        BottomAppBar(
                         actions = {
                             Text(
                                 text = if (activeNotesList.isEmpty()) "Nessuna nota presente" else "${activeNotesList.size} " + (if (activeNotesList.size == 1) "nota" else "note"),
@@ -345,6 +348,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                         containerColor = if (themeIsDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFF2F4FC),
                         contentPadding = PaddingValues(horizontal = 12.dp)
                     )
+                    }
                 }
             }
         ) { paddingValues ->
@@ -681,14 +685,17 @@ fun NoteItemCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Body content summary preview
+            // Body content summary preview (with auto-linkified URLs)
             if (note.content.isNotBlank()) {
-                Text(
+                LinkifiedText(
                     text = note.content,
-                    fontSize = 13.sp,
-                    color = contentColor.copy(alpha = 0.82f),
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontSize = 13.sp,
+                        color = contentColor.copy(alpha = 0.82f)
+                    ),
                     maxLines = 6,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    linkColor = MaterialTheme.colorScheme.primary
                 )
             }
 

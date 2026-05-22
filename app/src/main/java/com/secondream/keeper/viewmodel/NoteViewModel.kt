@@ -75,6 +75,17 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _userName = MutableStateFlow(prefs.getString("user_name", "Explorer") ?: "Explorer")
     val userName = _userName.asStateFlow()
 
+    // Accent color (the Keep yellow by default). Persisted as a Long ARGB.
+    private val _accentColorArgb = MutableStateFlow(
+        prefs.getLong("accent_color_argb", 0xFFFFCA28L)
+    )
+    val accentColorArgb: StateFlow<Long> = _accentColorArgb.asStateFlow()
+
+    fun setAccentColor(argb: Long) {
+        _accentColorArgb.value = argb
+        prefs.edit().putLong("accent_color_argb", argb).apply()
+    }
+
     // Note draft and temporary attachments upload simulation
     private val _tempAttachments = MutableStateFlow<List<Attachment>>(emptyList())
     val tempAttachments = _tempAttachments.asStateFlow()
@@ -149,15 +160,12 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val ctx = application.applicationContext
-                val oldDirs = listOf(
-                    java.io.File(ctx.cacheDir, "drive_attachments"),
-                    ctx.cacheDir
-                )
-                // Wipe the legacy drive_attachments dir
-                oldDirs[0].deleteRecursively()
-                // Wipe individual "attached_*.{jpg,mp4,pdf}" files from cacheDir root
-                oldDirs[1].listFiles()?.forEach { f ->
-                    if (f.isFile && f.name.startsWith("attached_")) f.delete()
+                val oldDir = java.io.File(ctx.cacheDir, "drive_attachments")
+                if (oldDir.exists()) oldDir.deleteRecursively()
+                ctx.cacheDir?.listFiles()?.forEach { f ->
+                    try {
+                        if (f.isFile && f.name.startsWith("attached_")) f.delete()
+                    } catch (_: Exception) {}
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -165,20 +173,35 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // One-time migration: legacy installs may have user_name_manual=true
-        // with no user_name_email associated, blocking the auto-derivation.
-        // Reset the flag so the next account connect re-derives the name.
-        if (!prefs.getBoolean("migration_v0_7_name", false)) {
-            val hasAssociatedEmail = !prefs.getString("user_name_email", "").isNullOrBlank()
-            if (!hasAssociatedEmail) {
-                prefs.edit()
-                    .putBoolean("user_name_manual", false)
-                    .putString("user_name", "Explorer")
-                    .putBoolean("migration_v0_7_name", true)
-                    .apply()
-                _userName.value = "Explorer"
-            } else {
-                prefs.edit().putBoolean("migration_v0_7_name", true).apply()
+        // with no user_name_email associated, blocking auto-derivation.
+        try {
+            if (!prefs.getBoolean("migration_v0_7_name", false)) {
+                val email = prefs.getString("user_name_email", "") ?: ""
+                if (email.isBlank()) {
+                    prefs.edit()
+                        .putBoolean("user_name_manual", false)
+                        .putString("user_name", "Explorer")
+                        .putBoolean("migration_v0_7_name", true)
+                        .apply()
+                    _userName.value = "Explorer"
+                } else {
+                    prefs.edit().putBoolean("migration_v0_7_name", true).apply()
+                }
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // On every startup, if the user is already connected to a Google
+        // account, force the display name to match it. This fixes stale
+        // "Eugenio Casale" left over from earlier app versions.
+        try {
+            val connectedEmail = _googleEmail.value
+            if (_isGoogleConnected.value && connectedEmail.isNotBlank()) {
+                forceUpdateUserNameFromEmail(connectedEmail)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -231,25 +254,18 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Update the displayed username from an email — but ONLY if the user
-     * never set it manually FOR THIS EMAIL. Switching to a different Google
-     * account forces a re-derivation, because the manual override was for
-     * the previous account.
+     * Always re-derive the display name from the connected account's email.
+     * Switching accounts switches the name. The Settings screen can still call
+     * setUserName for a manual override, but it'll be reset on the next
+     * account switch — that's by design (we want the name to match the account).
      */
-    private fun maybeUpdateUserNameFromEmail(email: String) {
-        val lastDerivedFromEmail = prefs.getString("user_name_email", "") ?: ""
-        val manualOverride = prefs.getBoolean("user_name_manual", false)
-
-        // If the user manually set the name for THIS email, keep it
-        if (manualOverride && lastDerivedFromEmail == email) return
-
+    private fun forceUpdateUserNameFromEmail(email: String) {
         val derived = deriveDisplayNameFromEmail(email)
         if (derived.isNotBlank()) {
             _userName.value = derived
             prefs.edit()
                 .putString("user_name", derived)
                 .putString("user_name_email", email)
-                .putBoolean("user_name_manual", false)
                 .apply()
         }
     }
@@ -393,11 +409,74 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _isConnectingAccount = MutableStateFlow(false)
     val isConnectingAccount: StateFlow<Boolean> = _isConnectingAccount.asStateFlow()
 
+    // Short-lived banner shown after an auto-sync completes successfully
+    private val _editSyncedBanner = MutableStateFlow(false)
+    val editSyncedBanner: StateFlow<Boolean> = _editSyncedBanner.asStateFlow()
+
+    fun showEditSyncedBanner() {
+        viewModelScope.launch {
+            _editSyncedBanner.value = true
+            kotlinx.coroutines.delay(2200)
+            _editSyncedBanner.value = false
+        }
+    }
+
+    /**
+     * When the user picks an account that's DIFFERENT from the previously
+     * connected one AND there are local notes, we surface a confirmation
+     * dialog before wiping the local DB and importing the new account's notes.
+     */
+    data class AccountSwitchRequest(val newEmail: String, val previousEmail: String)
+    private val _accountSwitchRequest = MutableStateFlow<AccountSwitchRequest?>(null)
+    val accountSwitchRequest: StateFlow<AccountSwitchRequest?> = _accountSwitchRequest.asStateFlow()
+
     fun connectAndSyncGoogleAccount(email: String) {
-        // Prevent re-entry while a connect is in flight — fixes the "account
-        // chooser appears twice" symptom from racing UI taps and the auth
-        // recovery flow re-triggering.
+        // Prevent re-entry while a connect is in flight
         if (_isConnectingAccount.value) return
+
+        // Detect account switch: if we already had a different account and
+        // there are local notes, ask the user to confirm wiping them.
+        val previousEmail = prefs.getString("google_email", null)
+        val hasLocalData = activeNotes.value.isNotEmpty() ||
+                          archivedNotes.value.isNotEmpty() ||
+                          trashedNotes.value.isNotEmpty()
+        if (!previousEmail.isNullOrBlank() && previousEmail != email && hasLocalData) {
+            _accountSwitchRequest.value = AccountSwitchRequest(
+                newEmail = email,
+                previousEmail = previousEmail
+            )
+            return
+        }
+
+        _isConnectingAccount.value = true
+        doConnectAccount(email)
+    }
+
+    /** User confirmed: wipe local notes then connect the new account. */
+    fun confirmAccountSwitch() {
+        val req = _accountSwitchRequest.value ?: return
+        _accountSwitchRequest.value = null
+        _isConnectingAccount.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.wipeAllNotes()
+                // Also clear local attachments since they belong to the old account
+                val attDir = java.io.File(getApplication<Application>().filesDir, "attachments")
+                if (attDir.exists()) attDir.deleteRecursively()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            doConnectAccount(req.newEmail)
+        }
+    }
+
+    /** User cancelled: keep current state, abort the switch. */
+    fun cancelAccountSwitch() {
+        _accountSwitchRequest.value = null
+        _isConnectingAccount.value = false
+    }
+
+    private fun doConnectAccount(email: String) {
         _isConnectingAccount.value = true
         viewModelScope.launch {
             _isSyncingNotes.value = true
@@ -418,7 +497,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                     completeOnboarding()
                     // Refresh the display name from the connected account
                     // (unless the user already overrode it manually)
-                    maybeUpdateUserNameFromEmail(email)
+                    forceUpdateUserNameFromEmail(email)
                     _syncMessage.value = "Connesso. Cartella Keeper pronta su Drive."
 
                     // Auto-import existing notes from Drive (covers the case
@@ -681,6 +760,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                     when (outcome) {
                         is DriveSyncRepository.SyncOutcome.Success -> {
                             repository.updateDriveFolder(note.id, outcome.folderId, System.currentTimeMillis())
+                            showEditSyncedBanner()
                         }
                         is DriveSyncRepository.SyncOutcome.NeedsUserAction -> {
                             _pendingAuthIntent.value = outcome.intent

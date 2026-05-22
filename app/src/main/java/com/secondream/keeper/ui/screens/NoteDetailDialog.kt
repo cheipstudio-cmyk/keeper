@@ -732,63 +732,10 @@ fun NoteDetailView(
                             .padding(bottom = 24.dp)
                     )
 
-                    // Inline Quick Composing Tools inside the note block
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SuggestionChip(
-                            onClick = { imageLauncher.launch("image/*") },
-                            label = { Text("Immagine", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                            icon = { Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = contentColor.copy(alpha = 0.08f),
-                                labelColor = contentColor,
-                                iconContentColor = contentColor
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                enabled = true,
-                                borderColor = contentColor.copy(alpha = 0.15f)
-                            )
-                        )
+                    // Removed redundant Immagine/Allegato/Checklist chips
+                    // (same actions already available in the bottom toolbar).
 
-                        SuggestionChip(
-                            onClick = { fileLauncher.launch("*/*") },
-                            label = { Text("Allegato", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                            icon = { Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = contentColor.copy(alpha = 0.08f),
-                                labelColor = contentColor,
-                                iconContentColor = contentColor
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                enabled = true,
-                                borderColor = contentColor.copy(alpha = 0.15f)
-                            )
-                        )
-
-                        SuggestionChip(
-                            onClick = {
-                                isChecklistActive = true
-                            },
-                            label = { Text("Checklist", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                            icon = { Icon(Icons.Outlined.CheckBox, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = contentColor.copy(alpha = 0.08f),
-                                labelColor = contentColor,
-                                iconContentColor = contentColor
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                enabled = true,
-                                borderColor = contentColor.copy(alpha = 0.15f)
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Checklist Section (if activated/non-empty)
                     if (isChecklistActive || checklistItems.isNotEmpty()) {
@@ -800,32 +747,32 @@ fun NoteDetailView(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Filled.List, "Checklist")
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            stringResource(R.string.checklist_header, checklistItems.size),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 13.sp,
-                                            color = contentColor
-                                        )
-                                    }
-
-                                    if (checklistItems.isNotEmpty()) {
-                                        TextButton(onClick = {
-                                            val checklistText = checklistItems.joinToString("\n") { item ->
-                                                if (item.checked) "• [x] ${item.text}" else "• [ ] ${item.text}"
-                                            }
-                                            content = if (content.isNotBlank()) "$content\n\n$checklistText" else checklistText
-                                            checklistItems = emptyList()
-                                            isChecklistActive = false
-                                        }) {
-                                            Text(stringResource(R.string.convert_to_text), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                // No more bulky "ELEMENTI CHECKLIST (N)" header — let
+                                // the list speak for itself. Only a small "convert"
+                                // icon-button in the top-end corner when items exist.
+                                if (checklistItems.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(
+                                            onClick = {
+                                                val checklistText = checklistItems.joinToString("\n") { item ->
+                                                    if (item.checked) "• [x] ${item.text}" else "• [ ] ${item.text}"
+                                                }
+                                                content = if (content.isNotBlank()) "$content\n\n$checklistText" else checklistText
+                                                checklistItems = emptyList()
+                                                isChecklistActive = false
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.TextFields,
+                                                contentDescription = stringResource(R.string.convert_to_text),
+                                                tint = contentColor.copy(alpha = 0.55f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -1208,185 +1155,31 @@ fun NoteDetailView(
                         }
                     }
 
-                    // Expanded Voice Dictation Wave Panel
-                    AnimatedVisibility(
-                        visible = showVoiceTray,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                                .border(1.dp, contentColor.copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
-                            colors = CardDefaults.cardColors(
-                                containerColor = contentColor.copy(alpha = 0.05f)
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Mic,
-                                            contentDescription = "Mic",
-                                            tint = if (isRecordingVoice) Color(0xFFE53935) else contentColor
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = stringResource(R.string.voice_recorder_title),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = contentColor
-                                        )
-                                    }
-                                    IconButton(onClick = {
-                                        if (isRecordingVoice) stopSpeechRecognition()
-                                        showVoiceTray = false
-                                    }) {
-                                        Icon(Icons.Default.Close, "Close", tint = contentColor.copy(alpha = 0.6f))
-                                    }
-                                }
-
-                                Text(
-                                    text = stringResource(R.string.voice_recorder_desc),
-                                    fontSize = 12.sp,
-                                    color = contentColor.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                )
-
-                                voiceError?.let { err ->
-                                    Text(
-                                        text = err,
-                                        color = Color(0xFFE53935),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-                                }
-
-                                if (isRecordingVoice) {
-                                    Row(
-                                        modifier = Modifier
-                                            .height(40.dp)
-                                            .fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        val infiniteTransition = rememberInfiniteTransition(label = "wave")
-                                        val heights = listOf(1, 2, 3, 4, 5).map { index ->
-                                            infiniteTransition.animateFloat(
-                                                initialValue = 10f,
-                                                targetValue = 35f,
-                                                animationSpec = infiniteRepeatable(
-                                                    animation = tween(
-                                                        durationMillis = 250 + (index * 120),
-                                                        easing = FastOutSlowInEasing
-                                                    ),
-                                                    repeatMode = RepeatMode.Reverse
-                                                ),
-                                                label = "bar_$index"
-                                            )
-                                        }
-
-                                        heights.forEach { heightVal ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .padding(horizontal = 3.dp)
-                                                    .width(4.dp)
-                                                    .height(heightVal.value.dp)
-                                                    .clip(RoundedCornerShape(2.dp))
-                                                    .background(Color(0xFFE53935))
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                OutlinedTextField(
-                                    value = dictationText,
-                                    onValueChange = { dictationText = it },
-                                    placeholder = {
-                                        Text(
-                                            text = if (isRecordingVoice) stringResource(R.string.voice_transcribing) else stringResource(R.string.voice_placeholder),
-                                            fontSize = 13.sp,
-                                            color = contentColor.copy(alpha = 0.5f)
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 90.dp, max = 200.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = contentColor,
-                                        unfocusedBorderColor = contentColor.copy(alpha = 0.2f),
-                                        focusedTextColor = contentColor,
-                                        unfocusedTextColor = contentColor,
-                                        cursorColor = contentColor
-                                    ),
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp)
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(
-                                        onClick = { toggleVoiceDictation() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isRecordingVoice) Color(0xFF424242) else Color(0xFFE53935),
-                                            contentColor = Color.White
-                                        ),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isRecordingVoice) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                            contentDescription = null
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (isRecordingVoice) stringResource(R.string.voice_stop) else stringResource(R.string.voice_start),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    if (dictationText.isNotEmpty()) {
-                                        Button(
-                                            onClick = {
-                                                if (isRecordingVoice) stopSpeechRecognition()
-                                                content = if (content.isNotBlank()) "$content\n$dictationText" else dictationText
-                                                dictationText = ""
-                                                dictationBaseText = ""
-                                                showVoiceTray = false
-                                                voiceError = null
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = contentColor,
-                                                contentColor = cardBackground
-                                            ),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Icon(Icons.Default.Check, null)
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(stringResource(R.string.convert_to_text), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
+                    // Voice Dictation: now opened as a Material bottom sheet
+                    if (showVoiceTray) {
+                        VoiceRecorderSheet(
+                            isRecording = isRecordingVoice,
+                            dictationText = dictationText,
+                            voiceError = voiceError,
+                            onToggleRecording = { toggleVoiceDictation() },
+                            onDismiss = {
+                                if (isRecordingVoice) stopSpeechRecognition()
+                                showVoiceTray = false
+                                voiceError = null
+                            },
+                            onConfirm = { editedText ->
+                                if (isRecordingVoice) stopSpeechRecognition()
+                                val finalText = editedText.ifBlank { dictationText }
+                                content = if (content.isNotBlank()) "$content\n$finalText" else finalText
+                                dictationText = ""
+                                dictationBaseText = ""
+                                showVoiceTray = false
+                                voiceError = null
                             }
-                        }
+                        )
                     }
 
-                    // Main Tool buttons
+                    // Main Tool buttons — colored card chips below each icon
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1395,57 +1188,42 @@ fun NoteDetailView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Color panel switcher
-                            IconButton(onClick = { showColorTray = !showColorTray }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Palette,
-                                    contentDescription = stringResource(R.string.palette_tooltip),
-                                    tint = contentColor
-                                )
-                            }
-
-                            // Tags label switch
-                            IconButton(onClick = { showLabelPicker = !showLabelPicker }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Label,
-                                    contentDescription = stringResource(R.string.tags_tooltip),
-                                    tint = contentColor
-                                )
-                            }
-
-                            // CHECKLIST INITIATE / EXTENDER
-                            IconButton(
-                                onClick = {
-                                    isChecklistActive = true
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CheckBox,
-                                    contentDescription = stringResource(R.string.checklist_tooltip),
-                                    tint = contentColor
-                                )
-                            }
-
-                            // Voice Dictation Panel Switcher
-                            IconButton(onClick = { showVoiceTray = !showVoiceTray }) {
-                                Icon(
-                                    imageVector = if (showVoiceTray) Icons.Filled.Mic else Icons.Outlined.Mic,
-                                    contentDescription = stringResource(R.string.voice_recorder_title),
-                                    tint = if (showVoiceTray) Color(0xFFE53935) else contentColor
-                                )
-                            }
-                        }
-
-                        // ATTACHMENT SIMULATED UPLOADS MENU
-                        var showAttachmentMenu by remember { mutableStateOf(false) }
-                        IconButton(onClick = { showAttachmentMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Default.AttachFile,
-                                contentDescription = stringResource(R.string.attach_file_tooltip),
-                                tint = contentColor
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            ToolbarChip(
+                                icon = Icons.Outlined.Palette,
+                                tint = Color(0xFFEC4899), // pink
+                                contentDescription = stringResource(R.string.palette_tooltip),
+                                onClick = { showColorTray = !showColorTray }
+                            )
+                            ToolbarChip(
+                                icon = Icons.Outlined.Label,
+                                tint = Color(0xFF3B82F6), // blue
+                                contentDescription = stringResource(R.string.tags_tooltip),
+                                onClick = { showLabelPicker = !showLabelPicker }
+                            )
+                            ToolbarChip(
+                                icon = Icons.Outlined.CheckBox,
+                                tint = Color(0xFF10B981), // green
+                                contentDescription = stringResource(R.string.checklist_tooltip),
+                                onClick = { isChecklistActive = true }
+                            )
+                            ToolbarChip(
+                                icon = if (showVoiceTray) Icons.Filled.Mic else Icons.Outlined.Mic,
+                                tint = Color(0xFFEF4444), // red
+                                contentDescription = stringResource(R.string.voice_recorder_title),
+                                onClick = { showVoiceTray = !showVoiceTray },
+                                active = showVoiceTray
                             )
                         }
+
+                        // Attachment picker
+                        var showAttachmentMenu by remember { mutableStateOf(false) }
+                        ToolbarChip(
+                            icon = Icons.Default.AttachFile,
+                            tint = Color(0xFFF59E0B), // amber
+                            contentDescription = stringResource(R.string.attach_file_tooltip),
+                            onClick = { showAttachmentMenu = true }
+                        )
                         if (showAttachmentMenu) {
                             AttachmentPickerSheet(
                                 onDismiss = { showAttachmentMenu = false },
@@ -1573,3 +1351,5 @@ fun copyUriToLocalFile(context: android.content.Context, uri: Uri): String {
         else -> ""
     }
 }
+
+// ToolbarChip composable is defined in NoteEditorComponents.kt

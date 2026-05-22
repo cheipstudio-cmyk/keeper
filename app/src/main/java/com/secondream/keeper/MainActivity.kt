@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.secondream.keeper.ui.screens.AccountSwitchDialog
 import com.secondream.keeper.ui.screens.ConnectingDialog
 import com.secondream.keeper.ui.screens.NoteApp
 import com.secondream.keeper.ui.screens.OnboardingDialog
@@ -59,7 +60,23 @@ class MainActivity : ComponentActivity() {
             // First-launch onboarding
             val onboardingCompleted by viewModel.onboardingCompleted.collectAsState()
 
-            MyApplicationTheme(darkTheme = useDarkTheme) {
+            // Status bar: light icons on dark theme, dark icons on light theme.
+            // The Compose-side equivalent of WindowInsetsControllerCompat for the
+            // status bar appearance (the "icons black" the user expects on light).
+            val view = androidx.compose.ui.platform.LocalView.current
+            LaunchedEffect(useDarkTheme, view) {
+                val window = (view.context as android.app.Activity).window
+                androidx.core.view.WindowCompat
+                    .getInsetsController(window, view)
+                    .isAppearanceLightStatusBars = !useDarkTheme
+            }
+
+            val accentArgb by viewModel.accentColorArgb.collectAsState()
+
+            MyApplicationTheme(
+                darkTheme = useDarkTheme,
+                accentColor = androidx.compose.ui.graphics.Color(accentArgb)
+            ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     NoteApp(viewModel = viewModel)
                     if (!onboardingCompleted) {
@@ -67,6 +84,8 @@ class MainActivity : ComponentActivity() {
                     }
                     // Loading overlay while Drive auth + initial import runs
                     ConnectingDialog(viewModel = viewModel)
+                    // Confirmation dialog when switching to a different Google account
+                    AccountSwitchDialog(viewModel = viewModel)
                 }
             }
         }

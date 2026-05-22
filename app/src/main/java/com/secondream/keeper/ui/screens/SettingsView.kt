@@ -155,6 +155,58 @@ fun SettingsView(
                         )
                     }
                 }
+
+                // Accent color picker
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Colore accento",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+                val accentArgb by viewModel.accentColorArgb.collectAsState()
+                val accentPalette = listOf(
+                    0xFFFFCA28L, // Keep yellow (default)
+                    0xFF3B82F6L, // blue
+                    0xFFEC4899L, // pink
+                    0xFF10B981L, // green
+                    0xFF8B5CF6L, // purple
+                    0xFFF97316L, // orange
+                    0xFF06B6D4L, // cyan
+                    0xFF6B7280L  // gray
+                )
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(accentPalette) { argb ->
+                        val color = Color(argb)
+                        val isSelected = argb == accentArgb
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    width = if (isSelected) 3.dp else 0.dp,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    shape = CircleShape
+                                )
+                                .clickable { viewModel.setAccentColor(argb) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1A1A1A),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

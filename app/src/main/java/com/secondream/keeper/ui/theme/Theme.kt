@@ -63,9 +63,11 @@ fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   // Dynamic color is available on Android 12+
   dynamicColor: Boolean = false,
+  // User-chosen accent color (defaults to Keep yellow when null)
+  accentColor: Color? = null,
   content: @Composable () -> Unit,
 ) {
-  val colorScheme =
+  val baseScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
@@ -75,6 +77,27 @@ fun MyApplicationTheme(
       darkTheme -> DarkColorScheme
       else -> LightColorScheme
     }
+
+  // Override primary + primaryContainer with the user's chosen accent.
+  // In light theme we keep the dark "primary" text color the same — only
+  // primaryContainer (the FAB / bottoni evidenziati) and the accent slot
+  // become the chosen color.
+  val colorScheme =
+    if (accentColor != null) {
+      if (darkTheme) {
+        baseScheme.copy(
+          primary = accentColor,
+          primaryContainer = accentColor,
+          onPrimary = Color(0xFF1F1F1F),
+          onPrimaryContainer = Color(0xFF1F1F1F)
+        )
+      } else {
+        baseScheme.copy(
+          primaryContainer = accentColor.copy(alpha = 0.85f),
+          onPrimaryContainer = Color(0xFF1A1A1A)
+        )
+      }
+    } else baseScheme
 
   MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }
