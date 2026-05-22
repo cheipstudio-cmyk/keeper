@@ -530,8 +530,9 @@ fun NoteDetailView(
                         }
 
                         // Sync indicator — pulses when the current note is uploading
+                        val activeUploads by viewModel.activeUploads.collectAsState()
                         val isUploading = note?.id?.let { id ->
-                            uploadingTasks.containsKey(id)
+                            activeUploads.containsKey(id)
                         } ?: false
                         if (isUploading) {
                             val infinite = androidx.compose.animation.core.rememberInfiniteTransition(

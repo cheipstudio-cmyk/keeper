@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -611,7 +612,84 @@ fun SettingsView(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // ─── Support / donation card ───
+        // ─── Security / App Lock card ───
+        val appLockEnabled by viewModel.appLockEnabled.collectAsState()
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            ),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Sicurezza",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Richiedi sblocco all'avvio",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Impronta o codice del telefono ogni volta che apri Keeper",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                            lineHeight = 15.sp
+                        )
+                    }
+                    Switch(
+                        checked = appLockEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                // Check that the device actually has a credential set up
+                                val biometricManager = androidx.biometric.BiometricManager.from(context)
+                                val canAuth = biometricManager.canAuthenticate(
+                                    androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                                    androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                                )
+                                if (canAuth == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+                                    viewModel.setAppLockEnabled(true)
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Imposta prima un PIN, codice o impronta sul telefono",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            } else {
+                                viewModel.setAppLockEnabled(false)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(

@@ -2,12 +2,12 @@ package com.secondream.keeper
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,7 +22,7 @@ import com.secondream.keeper.ui.screens.OnboardingDialog
 import com.secondream.keeper.ui.theme.MyApplicationTheme
 import com.secondream.keeper.viewmodel.NoteViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val viewModel: NoteViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -140,9 +140,20 @@ class MainActivity : ComponentActivity() {
                     ConnectingDialog(viewModel = viewModel)
                     // Confirmation dialog when switching to a different Google account
                     AccountSwitchDialog(viewModel = viewModel)
+                    // App lock overlay — drawn LAST so it's always on top
+                    val isLocked by viewModel.isLocked.collectAsState()
+                    if (isLocked) {
+                        com.secondream.keeper.ui.screens.LockScreen(viewModel = viewModel)
+                    }
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Re-lock whenever the app goes to background (if lock is enabled)
+        viewModel.lockApp()
     }
 
     override fun onNewIntent(intent: Intent) {

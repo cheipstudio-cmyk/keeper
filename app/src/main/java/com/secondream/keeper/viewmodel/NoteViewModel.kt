@@ -83,6 +83,28 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _userName = MutableStateFlow(prefs.getString("user_name", "Explorer") ?: "Explorer")
 
+    // App lock: when enabled, MainActivity shows a LockScreen overlay on
+    // launch / resume until biometric (or device credential) authentication
+    // succeeds. Setting is persisted in prefs.
+    private val _appLockEnabled = MutableStateFlow(prefs.getBoolean("app_lock_enabled", false))
+    val appLockEnabled: StateFlow<Boolean> = _appLockEnabled.asStateFlow()
+
+    private val _isLocked = MutableStateFlow(prefs.getBoolean("app_lock_enabled", false))
+    val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
+
+    fun setAppLockEnabled(enabled: Boolean) {
+        _appLockEnabled.value = enabled
+        prefs.edit().putBoolean("app_lock_enabled", enabled).apply()
+        // Turning off the lock immediately unlocks the UI
+        if (!enabled) _isLocked.value = false
+    }
+
+    fun lockApp() {
+        if (_appLockEnabled.value) _isLocked.value = true
+    }
+
+    fun unlockApp() { _isLocked.value = false }
+
     // External requests to open a specific note (from widget tap).
     // MainActivity drains this and triggers the detail dialog.
     private val _openNoteRequest = MutableStateFlow<Note?>(null)
