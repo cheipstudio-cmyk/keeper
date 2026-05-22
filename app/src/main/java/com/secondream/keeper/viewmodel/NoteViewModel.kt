@@ -76,9 +76,16 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     val userName = _userName.asStateFlow()
 
     // Persistent set of user-created labels that may have no note yet.
-    // Merged with notes' label strings to build the full label list.
-    private val _extraLabels = MutableStateFlow(
-        prefs.getStringSet("extra_labels", emptySet())?.toSet() ?: emptySet()
+    // Try/catch around prefs read because data-clear edge cases can
+    // sometimes return malformed sets and we never want to crash here.
+    private val _extraLabels = MutableStateFlow<Set<String>>(
+        try {
+            val raw = prefs.getStringSet("extra_labels", null)
+            raw?.toSet() ?: emptySet()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptySet()
+        }
     )
 
     fun createEmptyLabel(name: String) {
@@ -156,7 +163,6 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptySet()
         )
 
-        // Combine filter logic
         filteredNotes = combine(
             _currentScreen,
             activeNotes,
@@ -166,7 +172,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         ) { screen, active, archived, trashed, query ->
             val baseList = when (screen) {
                 is NavigationScreen.Notes -> active
-                is NavigationScreen.Reminders -> active.filter { it.getChecklist().isNotEmpty() } // Checklist filters for rich view
+                is NavigationScreen.Reminders -> active.filter { it.getChecklist().isNotEmpty() }
                 is NavigationScreen.Archive -> archived
                 is NavigationScreen.Trash -> trashed
                 is NavigationScreen.Label -> active.filter { it.getLabelsList().contains(screen.label) }
@@ -190,25 +196,28 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-        // Cleanup stale cache files from older app versions that wrote
-        // attachments into cacheDir. New attachments now live in filesDir.
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val ctx = application.applicationContext
-                val oldDir = java.io.File(ctx.cacheDir, "drive_attachments")
-                if (oldDir.exists()) oldDir.deleteRecursively()
-                ctx.cacheDir?.listFiles()?.forEach { f ->
-                    try {
-                        if (f.isFile && f.name.startsWith("attached_")) f.delete()
-                    } catch (_: Exception) {}
+        // All post-init side effects wrapped — if any of these throw we
+        // still want the ViewModel to construct successfully so the app
+        // opens. Crashing in init causes a relaunch loop after data wipe.
+        try {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val ctx = application.applicationContext
+                    val oldDir = java.io.File(ctx.cacheDir, "drive_attachments")
+                    if (oldDir.exists()) oldDir.deleteRecursively()
+                    ctx.cacheDir?.listFiles()?.forEach { f ->
+                        try {
+                            if (f.isFile && f.name.startsWith("attached_")) f.delete()
+                        } catch (_: Exception) {}
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("Keeper", "Cache cleanup failed", e)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
+        } catch (e: Exception) {
+            android.util.Log.e("Keeper", "Cache cleanup launch failed", e)
         }
 
-        // One-time migration: legacy installs may have user_name_manual=true
-        // with no user_name_email associated, blocking auto-derivation.
         try {
             if (!prefs.getBoolean("migration_v0_7_name", false)) {
                 val email = prefs.getString("user_name_email", "") ?: ""
@@ -224,13 +233,9 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("Keeper", "Username migration failed", e)
         }
 
-        // On every startup, if the user is already connected to a Google
-        // account, force the display name to match it. Reads straight from
-        // prefs to avoid forward-reference on _googleEmail / _isGoogleConnected
-        // declared later in the class.
         try {
             val connectedEmail = prefs.getString("google_email", "") ?: ""
             val isConnected = prefs.getBoolean("google_connected", false)
@@ -238,7 +243,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                 forceUpdateUserNameFromEmail(connectedEmail)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("Keeper", "Force update username failed", e)
         }
     }
 
@@ -497,17 +502,30 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         // Prevent re-entry while a connect is in flight
         if (_isConnectingAccount.value) return
 
-        // Detect account switch: if we already had a different account and
-        // there are local notes, ask the user to confirm wiping them.
+        // Detect account switch: if we already had a different account, ask
+        // the user to confirm wiping local notes. Querying the DB directly
+        // here (in a coroutine) instead of relying on the activeNotes Flow
+        // value, which can be empty if the Flow hasn't collected yet.
         val previousEmail = prefs.getString("google_email", null)
-        val hasLocalData = activeNotes.value.isNotEmpty() ||
-                          archivedNotes.value.isNotEmpty() ||
-                          trashedNotes.value.isNotEmpty()
-        if (!previousEmail.isNullOrBlank() && previousEmail != email && hasLocalData) {
-            _accountSwitchRequest.value = AccountSwitchRequest(
-                newEmail = email,
-                previousEmail = previousEmail
-            )
+        if (!previousEmail.isNullOrBlank() && previousEmail != email) {
+            _isConnectingAccount.value = false
+            viewModelScope.launch(Dispatchers.IO) {
+                val hasLocalData = try {
+                    repository.getAllNotesSync().isNotEmpty()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    false
+                }
+                if (hasLocalData) {
+                    _accountSwitchRequest.value = AccountSwitchRequest(
+                        newEmail = email,
+                        previousEmail = previousEmail
+                    )
+                } else {
+                    _isConnectingAccount.value = true
+                    doConnectAccount(email)
+                }
+            }
             return
         }
 
@@ -515,20 +533,85 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         doConnectAccount(email)
     }
 
-    /** User confirmed: wipe local notes then connect the new account. */
+    /**
+     * User confirmed switching accounts. Best-effort flow:
+     *   1) Upload remaining local notes to the OLD account's Drive (safety
+     *      net, so nothing is lost if the previous sync missed something).
+     *   2) Wipe local DB + attachments.
+     *   3) Connect to the new account and import its notes.
+     */
+    /**
+     * User confirmed switching accounts. Sequential phases, each visible
+     * to the user via _syncMessage:
+     *   1. Sync local notes to the OLD account (safety net)
+     *   2. Wipe local DB (HARD delete) + attachments folder
+     *   3. Verify the wipe actually emptied the DB (paranoia)
+     *   4. Connect to the new account
+     *   5. Import notes from the new account's Drive
+     */
     fun confirmAccountSwitch() {
         val req = _accountSwitchRequest.value ?: return
         _accountSwitchRequest.value = null
         _isConnectingAccount.value = true
         viewModelScope.launch(Dispatchers.IO) {
+            // ── Phase 1: safety sync to OLD account ──
+            try {
+                val rootId = _keeperRootFolderId.value
+                val notes = repository.getAllNotesSync()
+                if (!rootId.isNullOrBlank() && notes.isNotEmpty()) {
+                    _syncMessage.value = "1/4 Salvataggio finale di ${notes.size} note su ${req.previousEmail}..."
+                    for ((index, note) in notes.withIndex()) {
+                        _syncMessage.value = "1/4 Sincronizzo nota ${index + 1}/${notes.size}..."
+                        try {
+                            when (val outcome = driveRepo.uploadNote(req.previousEmail, note, rootId)) {
+                                is DriveSyncRepository.SyncOutcome.Success -> {
+                                    repository.updateDriveFolder(
+                                        note.id,
+                                        outcome.folderId,
+                                        System.currentTimeMillis()
+                                    )
+                                }
+                                else -> {
+                                    android.util.Log.w(
+                                        "Keeper",
+                                        "Safety sync of note ${note.id} failed; continuing"
+                                    )
+                                }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.w("Keeper", "Safety sync exception note ${note.id}", e)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("Keeper", "Phase 1 (safety sync) failed", e)
+            }
+
+            // ── Phase 2: HARD wipe local DB + attachments ──
+            _syncMessage.value = "2/4 Cancellazione dati locali..."
             try {
                 repository.wipeAllNotes()
-                // Also clear local attachments since they belong to the old account
                 val attDir = java.io.File(getApplication<Application>().filesDir, "attachments")
                 if (attDir.exists()) attDir.deleteRecursively()
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("Keeper", "Phase 2 (wipe) failed", e)
             }
+
+            // ── Phase 3: verify wipe is effective ──
+            _syncMessage.value = "3/4 Verifica..."
+            val remaining = try { repository.getAllNotesSync().size } catch (_: Exception) { 0 }
+            if (remaining > 0) {
+                // Force a second wipe if anything slipped through
+                android.util.Log.w("Keeper", "Wipe verification: $remaining notes remained, retrying")
+                try { repository.wipeAllNotes() } catch (_: Exception) {}
+            }
+
+            // Reset cached root folder so we don't reuse the OLD one
+            _keeperRootFolderId.value = null
+            prefs.edit().remove("keeper_root_folder_id").apply()
+
+            // ── Phase 4: connect to new account & import ──
+            _syncMessage.value = "4/4 Connessione a ${req.newEmail}..."
             doConnectAccount(req.newEmail)
         }
     }

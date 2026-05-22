@@ -431,9 +431,35 @@ fun NoteDetailView(
     }
 
 
+    // Snapshot of the note's state at OPEN time — used to decide whether
+    // the user actually made changes. If nothing differs at close time, we
+    // skip the update entirely (so no Drive banner triggers on back nav).
+    val initialTitle = remember(note?.id) { note?.title ?: "" }
+    val initialContent = remember(note?.id) { note?.content ?: "" }
+    val initialColorHex = remember(note?.id) { note?.colorHex ?: "" }
+    val initialIsPinned = remember(note?.id) { note?.isPinned ?: false }
+    val initialLabels = remember(note?.id) { note?.labels ?: "" }
+    val initialChecklistJson = remember(note?.id) { note?.checklistJson ?: "" }
+    val initialAttachmentsJson = remember(note?.id) { note?.attachmentsJson ?: "" }
+
     val saveAndDismiss: () -> Unit = {
-        if (title.isNotBlank() || content.isNotBlank() || checklistItems.isNotEmpty() || allAttachments.isNotEmpty()) {
-            if (note != null) {
+        val currentChecklistJson = if (checklistItems.isNotEmpty())
+            ChecklistItem.toJsonArray(checklistItems) else ""
+        val currentAttachmentsJson = if (allAttachments.isNotEmpty())
+            Attachment.toJsonArray(allAttachments) else ""
+
+        if (note != null) {
+            // Existing note: only update if at least one field actually changed
+            val changed =
+                title != initialTitle ||
+                content != initialContent ||
+                colorHex != initialColorHex ||
+                isPinned != initialIsPinned ||
+                labelsCSV != initialLabels ||
+                currentChecklistJson != initialChecklistJson ||
+                currentAttachmentsJson != initialAttachmentsJson
+
+            if (changed) {
                 viewModel.updateNote(
                     note.copy(
                         title = title,
@@ -441,11 +467,15 @@ fun NoteDetailView(
                         colorHex = colorHex,
                         isPinned = isPinned,
                         labels = labelsCSV,
-                        checklistJson = ChecklistItem.toJsonArray(checklistItems),
-                        attachmentsJson = Attachment.toJsonArray(allAttachments)
+                        checklistJson = currentChecklistJson,
+                        attachmentsJson = currentAttachmentsJson
                     )
                 )
-            } else {
+            }
+        } else {
+            // New note: only create if the user typed/added something
+            if (title.isNotBlank() || content.isNotBlank() ||
+                checklistItems.isNotEmpty() || allAttachments.isNotEmpty()) {
                 viewModel.createNote(
                     title = title,
                     content = content,
@@ -1188,28 +1218,29 @@ fun NoteDetailView(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val accentChipColor = MaterialTheme.colorScheme.primary
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             ToolbarChip(
                                 icon = Icons.Outlined.Palette,
-                                tint = Color(0xFFEC4899), // pink
+                                tint = accentChipColor,
                                 contentDescription = stringResource(R.string.palette_tooltip),
                                 onClick = { showColorTray = !showColorTray }
                             )
                             ToolbarChip(
                                 icon = Icons.Outlined.Label,
-                                tint = Color(0xFF3B82F6), // blue
+                                tint = accentChipColor,
                                 contentDescription = stringResource(R.string.tags_tooltip),
                                 onClick = { showLabelPicker = !showLabelPicker }
                             )
                             ToolbarChip(
                                 icon = Icons.Outlined.CheckBox,
-                                tint = Color(0xFF10B981), // green
+                                tint = accentChipColor,
                                 contentDescription = stringResource(R.string.checklist_tooltip),
                                 onClick = { isChecklistActive = true }
                             )
                             ToolbarChip(
                                 icon = if (showVoiceTray) Icons.Filled.Mic else Icons.Outlined.Mic,
-                                tint = Color(0xFFEF4444), // red
+                                tint = accentChipColor,
                                 contentDescription = stringResource(R.string.voice_recorder_title),
                                 onClick = { showVoiceTray = !showVoiceTray },
                                 active = showVoiceTray
@@ -1220,7 +1251,7 @@ fun NoteDetailView(
                         var showAttachmentMenu by remember { mutableStateOf(false) }
                         ToolbarChip(
                             icon = Icons.Default.AttachFile,
-                            tint = Color(0xFFF59E0B), // amber
+                            tint = accentChipColor,
                             contentDescription = stringResource(R.string.attach_file_tooltip),
                             onClick = { showAttachmentMenu = true }
                         )

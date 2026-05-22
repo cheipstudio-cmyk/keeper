@@ -169,31 +169,30 @@ fun NoteApp(viewModel: NoteViewModel) {
                 }
 
                 allLabels.forEach { label ->
-                    Box(
-                        modifier = Modifier
-                            .padding(NavigationDrawerItemDefaults.ItemPadding)
-                            .clip(RoundedCornerShape(28.dp))
-                            .combinedClickable(
-                                onClick = {
-                                    viewModel.navigateTo(NavigationScreen.Label(label))
-                                    scope.launch { drawerState.close() }
-                                },
-                                onLongClick = {
-                                    labelPendingDelete = label
-                                }
-                            )
-                    ) {
-                        NavigationDrawerItem(
-                            icon = { Icon(Icons.Outlined.Label, label) },
-                            label = { Text(label) },
-                            selected = currentScreen is NavigationScreen.Label &&
-                                       (currentScreen as NavigationScreen.Label).label == label,
-                            onClick = {
-                                viewModel.navigateTo(NavigationScreen.Label(label))
-                                scope.launch { drawerState.close() }
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Outlined.Label, label) },
+                        label = { Text(label) },
+                        badge = {
+                            IconButton(
+                                onClick = { labelPendingDelete = label },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = "Elimina etichetta",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
-                        )
-                    }
+                        },
+                        selected = currentScreen is NavigationScreen.Label &&
+                                   (currentScreen as NavigationScreen.Label).label == label,
+                        onClick = {
+                            viewModel.navigateTo(NavigationScreen.Label(label))
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
                 }
 
                 if (allLabels.isNotEmpty()) {
@@ -417,16 +416,8 @@ fun NoteApp(viewModel: NoteViewModel) {
                 }
             },
             bottomBar = {
-                if (currentScreen is NavigationScreen.Notes) {
-                    Column {
-                        // Short banner shown briefly after a successful auto-sync
-                        EditSyncedBanner(viewModel = viewModel)
-                        // No bulky bottom app bar. Just leave room for the nav bar.
-                        Spacer(modifier = Modifier
-                            .navigationBarsPadding()
-                            .height(0.dp))
-                    }
-                }
+                // Empty slot — banner is rendered as an absolute overlay so
+                // it never pushes the FAB around.
             },
             floatingActionButton = {
                 if (currentScreen is NavigationScreen.Notes) {
@@ -595,7 +586,23 @@ fun NoteApp(viewModel: NoteViewModel) {
                     }
                 }
             }
-            }   // close Box wrapper
+            }   // close Box wrapper — banner overlay sits AFTER all content
+            // so it draws on top of the FAB area without affecting layout.
+            if (currentScreen is NavigationScreen.Notes) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.BottomStart
+                ) {
+                    EditSyncedBanner(
+                        viewModel = viewModel,
+                        modifier = Modifier
+                            .navigationBarsPadding()
+                            .padding(end = 80.dp, bottom = 8.dp)
+                    )
+                }
+            }
         }
     }
 

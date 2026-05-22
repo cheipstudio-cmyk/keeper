@@ -6,7 +6,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -25,48 +24,40 @@ fun AccountSwitchDialog(viewModel: NoteViewModel) {
             Icon(
                 imageVector = Icons.Rounded.SwapHoriz,
                 contentDescription = null,
-                tint = Color(0xFFFFCA28),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(36.dp)
             )
         },
         title = {
             Text(
-                text = "Cambiare account?",
+                text = "Cambio account",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
         },
         text = {
             Column {
+                LabelRow(label = "Account attuale", value = pending.previousEmail)
+                Spacer(modifier = Modifier.height(10.dp))
+                LabelRow(label = "Nuovo account", value = pending.newEmail)
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Stai passando da",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    text = "Cosa farò, in ordine:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                BulletStep("1.", "Sincronizzo tutte le note locali sul Drive di ${pending.previousEmail}")
+                BulletStep("2.", "Cancello le note dal telefono")
+                BulletStep("3.", "Mi connetto a ${pending.newEmail}")
+                BulletStep("4.", "Importo le note dal Drive di ${pending.newEmail}")
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = pending.previousEmail,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "a",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = pending.newEmail,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = "Le note locali del vecchio account verranno eliminate per evitare di mescolarle. Le note dell'altro account sono al sicuro sul tuo Drive.",
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                    text = "Nessuna nota viene persa: tutto resta sul Drive di ciascun account.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    lineHeight = 17.sp
                 )
             }
         },
@@ -74,8 +65,8 @@ fun AccountSwitchDialog(viewModel: NoteViewModel) {
             Button(
                 onClick = { viewModel.confirmAccountSwitch() },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFCA28),
-                    contentColor = Color(0xFF1A1A1A)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -89,4 +80,41 @@ fun AccountSwitchDialog(viewModel: NoteViewModel) {
         },
         shape = RoundedCornerShape(22.dp)
     )
+}
+
+@Composable
+private fun LabelRow(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun BulletStep(number: String, text: String) {
+    Row(modifier = Modifier.padding(vertical = 3.dp)) {
+        Text(
+            text = number,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(20.dp)
+        )
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+        )
+    }
 }
