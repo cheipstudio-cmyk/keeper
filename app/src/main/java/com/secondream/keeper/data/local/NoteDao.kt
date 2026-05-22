@@ -55,7 +55,4 @@ interface NoteDao {
 
     @Query("SELECT * FROM notes WHERE isTrashed = 1")
     suspend fun getTrashedNotesSync(): List<Note>
-
-    @Query("SELECT * FROM notes")
-    suspend fun getAllNotesSync(): List<Note>
 }
