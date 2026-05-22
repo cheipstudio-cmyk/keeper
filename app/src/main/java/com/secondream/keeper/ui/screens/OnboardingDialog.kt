@@ -82,8 +82,7 @@ fun OnboardingDialog(
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = false,
-            dismissOnClickOutside = false,
-            decorFitsSystemWindows = false
+            dismissOnClickOutside = false
         )
     ) {
         Surface(
@@ -105,15 +104,24 @@ fun OnboardingDialog(
                         .padding(horizontal = 32.dp, vertical = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Hero: real app icon
-                    Image(
-                        painter = painterResource(id = com.secondream.keeper.R.mipmap.ic_launcher),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    // Hero: a Material icon we know renders safely on every
+                    // device. We previously used painterResource(R.mipmap.ic_launcher)
+                    // but the launcher is an adaptive-icon XML on API 26+ which
+                    // Compose can't load as a Painter — it crashed the dialog.
+                    Box(
                         modifier = Modifier
                             .size(120.dp)
                             .clip(RoundedCornerShape(28.dp))
-                    )
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.NoteAlt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(64.dp)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(28.dp))
 

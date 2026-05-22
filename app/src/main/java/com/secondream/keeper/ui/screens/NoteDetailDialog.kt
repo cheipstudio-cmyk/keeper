@@ -495,7 +495,6 @@ fun NoteDetailView(
     }
 
     val focusManager = LocalFocusManager.current
-    val accentChipColor = MaterialTheme.colorScheme.primary
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -515,7 +514,7 @@ fun NoteDetailView(
                         }
                     },
                     actions = {
-                        // Share button stays as a plain icon (frequent action)
+                        // Share
                         IconButton(onClick = {
                             val paths = allAttachments
                                 .map { it.uri }
@@ -530,51 +529,42 @@ fun NoteDetailView(
                             Icon(Icons.Filled.Share, stringResource(R.string.share_note))
                         }
 
-                        Spacer(modifier = Modifier.width(6.dp))
+                        // Pin — toggle, save & exit. Stays as plain top-bar icon
+                        // so it inherits contentColor (black on light, white on
+                        // dark) and is always readable.
+                        IconButton(onClick = {
+                            isPinned = !isPinned
+                            saveAndDismiss()
+                        }) {
+                            Icon(
+                                imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = stringResource(R.string.pin_tooltip)
+                            )
+                        }
 
-                        // Pin chip — toggles pin, persists, and exits the note
-                        ToolbarChip(
-                            icon = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                            tint = accentChipColor,
-                            contentDescription = stringResource(R.string.pin_tooltip),
-                            onClick = {
-                                isPinned = !isPinned
-                                // Persist via saveAndDismiss so the change goes
-                                // through the normal update path, and exit
-                                saveAndDismiss()
-                            },
-                            active = isPinned
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Archive chip — only meaningful on existing notes
                         if (note != null) {
-                            ToolbarChip(
-                                icon = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                                tint = accentChipColor,
-                                contentDescription = if (note.isArchived)
-                                    stringResource(R.string.unarchive_note)
-                                else
-                                    stringResource(R.string.archive_tooltip),
-                                onClick = {
-                                    if (note.isArchived) viewModel.unarchiveNote(note.id)
-                                    else viewModel.archiveNote(note.id)
-                                    onDismiss()
-                                }
-                            )
+                            // Archive — toggle & exit
+                            IconButton(onClick = {
+                                if (note.isArchived) viewModel.unarchiveNote(note.id)
+                                else viewModel.archiveNote(note.id)
+                                onDismiss()
+                            }) {
+                                Icon(
+                                    imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                                    contentDescription = if (note.isArchived)
+                                        stringResource(R.string.unarchive_note)
+                                    else
+                                        stringResource(R.string.archive_tooltip)
+                                )
+                            }
 
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Delete chip — confirms then trashes & exits
-                            ToolbarChip(
-                                icon = Icons.Outlined.Delete,
-                                tint = accentChipColor,
-                                contentDescription = stringResource(R.string.trash_tooltip),
-                                onClick = { showDeleteConfirm = true }
-                            )
-
-                            Spacer(modifier = Modifier.width(6.dp))
+                            // Delete — confirm then trash & exit
+                            IconButton(onClick = { showDeleteConfirm = true }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Delete,
+                                    contentDescription = stringResource(R.string.trash_tooltip)
+                                )
+                            }
                         }
                     }
                 )

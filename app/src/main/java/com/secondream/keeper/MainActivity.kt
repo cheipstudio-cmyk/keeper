@@ -26,8 +26,53 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        android.util.Log.i("KeeperLifecycle", "MainActivity.onCreate START")
+
+        // Surface previous crash & break onboarding-related crash loops.
+        var skipOnboarding = false
+        try {
+            val crashFile = java.io.File(filesDir, "last_crash.txt")
+            if (crashFile.exists()) {
+                val content = crashFile.readText()
+                android.util.Log.e("KeeperPriorCrash", content)
+                val mentionsOnboarding = content.contains("Onboarding", ignoreCase = true) ||
+                                         content.contains("painterResource", ignoreCase = true) ||
+                                         content.contains("mipmap", ignoreCase = true) ||
+                                         content.contains("adaptive", ignoreCase = true)
+                if (mentionsOnboarding) {
+                    // Force-skip onboarding so we don't crash again on the same path
+                    val prefs = getSharedPreferences("keep_notes_prefs", MODE_PRIVATE)
+                    prefs.edit().putBoolean("onboarding_completed", true).apply()
+                    skipOnboarding = true
+                    android.widget.Toast.makeText(
+                        this,
+                        "Skipping onboarding: precedente crash rilevato (vedi log)",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    val summary = content.lines()
+                        .firstOrNull { it.contains("Exception") || it.contains("Error:") }
+                        ?: "Crash precedente"
+                    android.widget.Toast.makeText(
+                        this,
+                        summary.take(180),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                crashFile.delete()
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("KeeperPriorCrash", "Could not read crash file", e)
+        }
+        android.util.Log.i("KeeperLifecycle", "skipOnboarding=$skipOnboarding")
+
+        try {
+            enableEdgeToEdge()
+        } catch (e: Exception) {
+            android.util.Log.w("KeeperLifecycle", "enableEdgeToEdge failed", e)
+        }
         setContent {
+            android.util.Log.i("KeeperLifecycle", "setContent composing")
             val darkThemePref by viewModel.darkThemeOption.collectAsState()
             val useDarkTheme = when (darkThemePref) {
                 "dark" -> true
@@ -61,14 +106,18 @@ class MainActivity : ComponentActivity() {
             val onboardingCompleted by viewModel.onboardingCompleted.collectAsState()
 
             // Status bar: light icons on dark theme, dark icons on light theme.
-            // The Compose-side equivalent of WindowInsetsControllerCompat for the
-            // status bar appearance (the "icons black" the user expects on light).
             val view = androidx.compose.ui.platform.LocalView.current
             LaunchedEffect(useDarkTheme, view) {
-                val window = (view.context as android.app.Activity).window
-                androidx.core.view.WindowCompat
-                    .getInsetsController(window, view)
-                    .isAppearanceLightStatusBars = !useDarkTheme
+                try {
+                    val activity = view.context as? android.app.Activity
+                    if (activity != null) {
+                        androidx.core.view.WindowCompat
+                            .getInsetsController(activity.window, view)
+                            .isAppearanceLightStatusBars = !useDarkTheme
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("KeeperLifecycle", "Status bar config failed", e)
+                }
             }
 
             val accentArgb by viewModel.accentColorArgb.collectAsState()
