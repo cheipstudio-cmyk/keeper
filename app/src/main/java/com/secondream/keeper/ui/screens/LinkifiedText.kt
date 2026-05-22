@@ -68,8 +68,8 @@ fun LinkifiedText(
     var layoutResult: TextLayoutResult? = null
     val hasUrls = annotated.getStringAnnotations(tag = "URL", 0, annotated.length).isNotEmpty()
 
-    val tapModifier = if (hasUrls) {
-        Modifier.pointerInput(annotated) {
+    val tapModifier = when {
+        hasUrls -> Modifier.pointerInput(annotated) {
             detectTapGestures(
                 onTap = { pos ->
                     val layout = layoutResult ?: return@detectTapGestures
@@ -82,9 +82,10 @@ fun LinkifiedText(
                 }
             )
         }
-    } else {
-        // No URLs — DO NOT consume tap events. Parent receives them.
-        Modifier
+        onPlainClick != null -> Modifier.pointerInput(Unit) {
+            detectTapGestures(onTap = { onPlainClick.invoke() })
+        }
+        else -> Modifier
     }
 
     Text(

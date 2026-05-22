@@ -955,7 +955,7 @@ fun NoteItemCard(
                                     .size(16.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (item.checked) Color(0xFFFFCA28)
+                                        if (item.checked) MaterialTheme.colorScheme.primary
                                         else Color.Transparent
                                     )
                                     .border(
@@ -969,7 +969,7 @@ fun NoteItemCard(
                                     Icon(
                                         imageVector = Icons.Rounded.Check,
                                         contentDescription = null,
-                                        tint = Color(0xFF1A1A1A),
+                                        tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(11.dp)
                                     )
                                 }

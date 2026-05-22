@@ -962,7 +962,7 @@ fun NoteDetailView(
                                             )
                                             val tickContainerColor by animateColorAsState(
                                                 targetValue = if (item.checked)
-                                                    Color(0xFFFFCA28)
+                                                    MaterialTheme.colorScheme.primary
                                                 else
                                                     Color.Transparent,
                                                 animationSpec = tween(220),
@@ -989,7 +989,7 @@ fun NoteDetailView(
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = Color(0xFF1A1A1A),
+                                                    tint = MaterialTheme.colorScheme.onPrimary,
                                                     modifier = Modifier
                                                         .size(20.dp)
                                                         .graphicsLayer {
