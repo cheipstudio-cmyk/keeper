@@ -265,14 +265,31 @@ fun NoteDetailView(
             if (name == "attached_file") {
                 name = "Image_${System.currentTimeMillis()}.jpg"
             }
-            val localPath = copyUriToLocalFile(context, it)
-            savedAttachments = savedAttachments + Attachment(
-                id = java.util.UUID.randomUUID().toString(),
-                type = "image",
-                uri = localPath,
-                name = name,
-                size = size
-            )
+            val copyResult = copyUriToLocalFileSafe(context, it)
+            when (copyResult) {
+                is CopyResult.Success -> {
+                    savedAttachments = savedAttachments + Attachment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        type = "image",
+                        uri = copyResult.fileUri,
+                        name = name,
+                        size = size
+                    )
+                }
+                CopyResult.TooLarge -> {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Immagine troppo grande (max 30 MB)",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                CopyResult.Error -> {
+                    android.widget.Toast.makeText(
+                        context, "Errore durante l'aggiunta dell'immagine",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 
@@ -304,14 +321,31 @@ fun NoteDetailView(
             if (name == "attached_file") {
                 name = "Video_${System.currentTimeMillis()}.mp4"
             }
-            val localPath = copyUriToLocalFile(context, it)
-            savedAttachments = savedAttachments + Attachment(
-                id = java.util.UUID.randomUUID().toString(),
-                type = "video",
-                uri = localPath,
-                name = name,
-                size = size
-            )
+            val copyResultV = copyUriToLocalFileSafe(context, it)
+            when (copyResultV) {
+                is CopyResult.Success -> {
+                    savedAttachments = savedAttachments + Attachment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        type = "video",
+                        uri = copyResultV.fileUri,
+                        name = name,
+                        size = size
+                    )
+                }
+                CopyResult.TooLarge -> {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Video troppo grande (max 30 MB)",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                CopyResult.Error -> {
+                    android.widget.Toast.makeText(
+                        context, "Errore durante l'aggiunta del video",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 
@@ -343,14 +377,31 @@ fun NoteDetailView(
             if (name == "attached_file") {
                 name = "Document_${System.currentTimeMillis()}.pdf"
             }
-            val localPath = copyUriToLocalFile(context, it)
-            savedAttachments = savedAttachments + Attachment(
-                id = java.util.UUID.randomUUID().toString(),
-                type = "file",
-                uri = localPath,
-                name = name,
-                size = size
-            )
+            val copyResultF = copyUriToLocalFileSafe(context, it)
+            when (copyResultF) {
+                is CopyResult.Success -> {
+                    savedAttachments = savedAttachments + Attachment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        type = "file",
+                        uri = copyResultF.fileUri,
+                        name = name,
+                        size = size
+                    )
+                }
+                CopyResult.TooLarge -> {
+                    android.widget.Toast.makeText(
+                        context,
+                        "File troppo grande (max 30 MB)",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                CopyResult.Error -> {
+                    android.widget.Toast.makeText(
+                        context, "Errore durante l'aggiunta del file",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 
@@ -485,6 +536,7 @@ fun NoteDetailView(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp)
+                        .imePadding()
                         .verticalScroll(rememberScrollState())
                 ) {
                     // Attachment Previews section (Always show beautiful grid)
@@ -907,6 +959,18 @@ fun NoteDetailView(
                                             onValueChange = { newChecklistItemText = it },
                                             placeholder = { Text(stringResource(R.string.checklist_placeholder), fontSize = 14.sp) },
                                             singleLine = true,
+                                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                                                capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences
+                                            ),
+                                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                                                onDone = {
+                                                    if (newChecklistItemText.isNotBlank()) {
+                                                        checklistItems = checklistItems + ChecklistItem(newChecklistItemText)
+                                                        newChecklistItemText = ""
+                                                    }
+                                                }
+                                            ),
                                             colors = TextFieldDefaults.colors(
                                                 focusedContainerColor = Color.Transparent,
                                                 unfocusedContainerColor = Color.Transparent,
@@ -1444,24 +1508,76 @@ fun isSystemInDarkThemeCustom(viewModel: NoteViewModel): Boolean {
     }
 }
 
-fun copyUriToLocalFile(context: android.content.Context, uri: Uri): String {
+/** Max attachment size in bytes (30 MB). Attempts above this are refused. */
+const val MAX_ATTACHMENT_SIZE_BYTES: Long = 30L * 1024L * 1024L
+
+/**
+ * Result of an attachment copy attempt: either a successful URI or a typed failure.
+ */
+sealed class CopyResult {
+    data class Success(val fileUri: String) : CopyResult()
+    object TooLarge : CopyResult()
+    object Error : CopyResult()
+}
+
+/**
+ * Copy a content URI to the app's private files folder (persistent, NOT cache).
+ * Rejects attachments larger than [MAX_ATTACHMENT_SIZE_BYTES].
+ */
+fun copyUriToLocalFileSafe(context: android.content.Context, uri: Uri): CopyResult {
     return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()
+        // Check size first via OpenableColumns or stat
+        val sizeBytes = runCatching {
+            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
+        }.getOrNull()
+        if (sizeBytes != null && sizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+            return CopyResult.TooLarge
+        }
+
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return CopyResult.Error
         val type = context.contentResolver.getType(uri)
         val extension = when {
             type?.startsWith("image/") == true -> "jpg"
             type?.startsWith("video/") == true -> "mp4"
             else -> "pdf"
         }
-        val file = java.io.File(context.cacheDir, "attached_${System.currentTimeMillis()}.$extension")
+
+        // Persistent storage: filesDir is preserved across cache wipes / OS cleanups
+        val attachmentsDir = java.io.File(context.filesDir, "attachments").apply { mkdirs() }
+        val file = java.io.File(attachmentsDir, "att_${System.currentTimeMillis()}.$extension")
+
+        var bytesCopied = 0L
         inputStream.use { input ->
             file.outputStream().use { output ->
-                input.copyTo(output)
+                val buf = ByteArray(8192)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    output.write(buf, 0, n)
+                    bytesCopied += n
+                    if (bytesCopied > MAX_ATTACHMENT_SIZE_BYTES) {
+                        // Streaming exceeded the limit — abort and clean up
+                        output.close()
+                        file.delete()
+                        return CopyResult.TooLarge
+                    }
+                }
             }
         }
-        "file://" + file.absolutePath
+        CopyResult.Success("file://" + file.absolutePath)
     } catch (e: Exception) {
         e.printStackTrace()
-        uri.toString()
+        CopyResult.Error
+    }
+}
+
+/**
+ * Legacy helper kept for backward compatibility: returns the URI string,
+ * with the new size check applied. Empty string means rejected/failed.
+ */
+fun copyUriToLocalFile(context: android.content.Context, uri: Uri): String {
+    return when (val r = copyUriToLocalFileSafe(context, uri)) {
+        is CopyResult.Success -> r.fileUri
+        else -> ""
     }
 }

@@ -181,7 +181,7 @@ class DriveSyncRepository(
         val noteFolders = rootList.filter { it.mimeType == DriveSync.FOLDER_MIME && it.name.startsWith("note_") }
         if (noteFolders.isEmpty()) return ImportOutcome.Success(emptyList())
 
-        val cacheDir = File(context.cacheDir, "drive_attachments").apply { mkdirs() }
+        val attachmentsDir = File(context.filesDir, "attachments").apply { mkdirs() }
         val imported = mutableListOf<ImportedNote>()
 
         noteFolders.forEachIndexed { index, folder ->
@@ -238,7 +238,7 @@ class DriveSyncRepository(
                     continue
                 }
 
-                val localFile = File(cacheDir, "${folder.id}_$driveFileName")
+                val localFile = File(attachmentsDir, "drive_${folder.id}_$driveFileName")
                 if (!localFile.exists()) {
                     val r = drive.downloadFileToLocal(accountName, driveAttEntry.id, localFile)
                     when (r) {

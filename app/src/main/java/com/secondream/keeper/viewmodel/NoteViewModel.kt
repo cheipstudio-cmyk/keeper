@@ -143,6 +143,26 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+        // Cleanup stale cache files from older app versions that wrote
+        // attachments into cacheDir. New attachments now live in filesDir.
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val ctx = application.applicationContext
+                val oldDirs = listOf(
+                    java.io.File(ctx.cacheDir, "drive_attachments"),
+                    ctx.cacheDir
+                )
+                // Wipe the legacy drive_attachments dir
+                oldDirs[0].deleteRecursively()
+                // Wipe individual "attached_*.{jpg,mp4,pdf}" files from cacheDir root
+                oldDirs[1].listFiles()?.forEach { f ->
+                    if (f.isFile && f.name.startsWith("attached_")) f.delete()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     // Setters
@@ -175,6 +195,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit()
             .putString("user_name", name)
             .putBoolean("user_name_manual", true)
+            .putString("user_name_email", _googleEmail.value)
             .apply()
     }
 
@@ -194,17 +215,25 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Update the displayed username from an email — but ONLY if the user
-     * never set it manually. This way switching accounts updates the name,
-     * but a manually-typed name is preserved.
+     * never set it manually FOR THIS EMAIL. Switching to a different Google
+     * account forces a re-derivation, because the manual override was for
+     * the previous account.
      */
     private fun maybeUpdateUserNameFromEmail(email: String) {
+        val lastDerivedFromEmail = prefs.getString("user_name_email", "") ?: ""
         val manualOverride = prefs.getBoolean("user_name_manual", false)
-        if (manualOverride) return
+
+        // If the user manually set the name for THIS email, keep it
+        if (manualOverride && lastDerivedFromEmail == email) return
+
         val derived = deriveDisplayNameFromEmail(email)
-        if (derived.isNotBlank() && derived != _userName.value) {
+        if (derived.isNotBlank()) {
             _userName.value = derived
-            // Save WITHOUT setting the manual flag
-            prefs.edit().putString("user_name", derived).apply()
+            prefs.edit()
+                .putString("user_name", derived)
+                .putString("user_name_email", email)
+                .putBoolean("user_name_manual", false)
+                .apply()
         }
     }
 
@@ -344,7 +373,14 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
      * Try the OAuth handshake and create/find the Keeper root folder.
      * Called once when the user picks an account from the chooser.
      */
+    private val _isConnectingAccount = MutableStateFlow(false)
+
     fun connectAndSyncGoogleAccount(email: String) {
+        // Prevent re-entry while a connect is in flight — fixes the "account
+        // chooser appears twice" symptom from racing UI taps and the auth
+        // recovery flow re-triggering.
+        if (_isConnectingAccount.value) return
+        _isConnectingAccount.value = true
         viewModelScope.launch {
             _isSyncingNotes.value = true
             _syncMessage.value = "Connessione a Google Drive..."
@@ -423,6 +459,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             }
             delay(700)
             _isSyncingNotes.value = false
+            _isConnectingAccount.value = false
         }
     }
 

@@ -3,7 +3,6 @@ package com.secondream.keeper.ui.screens
 import android.accounts.AccountManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,10 +10,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.DevicesOther
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.NoteAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,8 +32,12 @@ import com.secondream.keeper.R
 import com.secondream.keeper.viewmodel.NoteViewModel
 
 /**
- * Onboarding shown at the very first launch — strongly nudges (but doesn't
- * absolutely force) the user to connect Google Drive so notes get backed up.
+ * Onboarding shown at the very first launch — explains what Keeper does and
+ * strongly nudges the user to connect Google Drive so notes get backed up.
+ *
+ * Centering strategy: a Box with fillMaxSize + contentAlignment.Center keeps
+ * the inner Column vertically centered regardless of phone size, with the
+ * Column being scrollable as a safety net on tiny displays.
  */
 @Composable
 fun OnboardingDialog(
@@ -42,9 +45,14 @@ fun OnboardingDialog(
 ) {
     val context = LocalContext.current
 
+    // Guard against the user accidentally double-tapping which would cause
+    // two consecutive account chooser intents to be queued
+    var hasLaunchedPicker by remember { mutableStateOf(false) }
+
     val accountChooserLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        hasLaunchedPicker = false
         val accountName = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
         if (!accountName.isNullOrBlank()) {
             viewModel.connectAndSyncGoogleAccount(accountName)
@@ -52,13 +60,17 @@ fun OnboardingDialog(
     }
 
     val triggerGooglePicker: () -> Unit = {
-        try {
-            val intent = AccountManager.newChooseAccountIntent(
-                null, null, arrayOf("com.google"), null, null, null, null
-            )
-            accountChooserLauncher.launch(intent)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (!hasLaunchedPicker) {
+            hasLaunchedPicker = true
+            try {
+                val intent = AccountManager.newChooseAccountIntent(
+                    null, null, arrayOf("com.google"), null, null, null, null
+                )
+                accountChooserLauncher.launch(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                hasLaunchedPicker = false
+            }
         }
     }
 
@@ -67,136 +79,136 @@ fun OnboardingDialog(
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = false,
-            dismissOnClickOutside = false
+            dismissOnClickOutside = false,
+            decorFitsSystemWindows = false
         )
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            val scrollState = rememberScrollState()
-            Column(
+            // Outer Box centers the column vertically. The Column itself is
+            // scrollable so on tiny phones nothing gets clipped.
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .systemBarsPadding()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 28.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .systemBarsPadding(),
+                contentAlignment = Alignment.Center
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Animated icon
-                val infiniteTransition = rememberInfiniteTransition(label = "icon_anim")
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 0.95f,
-                    targetValue = 1.05f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1200, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "icon_scale"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFFCA28)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.NoteAdd,
-                        contentDescription = null,
-                        tint = Color(0xFF1A1A1A),
-                        modifier = Modifier.size((54 * scale).dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(
-                    text = stringResource(R.string.onboarding_welcome_title),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = stringResource(R.string.onboarding_welcome_subtitle),
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Feature bullets
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 28.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    FeatureBullet(
-                        icon = Icons.Default.CloudUpload,
-                        title = stringResource(R.string.onboarding_feature_backup_title),
-                        body = stringResource(R.string.onboarding_feature_backup_body)
-                    )
-                    FeatureBullet(
-                        icon = Icons.Default.Lock,
-                        title = stringResource(R.string.onboarding_feature_private_title),
-                        body = stringResource(R.string.onboarding_feature_private_body)
-                    )
-                    FeatureBullet(
-                        icon = Icons.Default.CloudDone,
-                        title = stringResource(R.string.onboarding_feature_restore_title),
-                        body = stringResource(R.string.onboarding_feature_restore_body)
-                    )
-                }
+                    // Hero icon
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFCA28)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.NoteAlt,
+                            contentDescription = null,
+                            tint = Color(0xFF1A1A1A),
+                            modifier = Modifier.size(52.dp)
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                // Primary action
-                Button(
-                    onClick = { triggerGooglePicker() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFCA28),
-                        contentColor = Color(0xFF1A1A1A)
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
                     Text(
-                        text = stringResource(R.string.onboarding_connect_drive),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
+                        text = stringResource(R.string.onboarding_welcome_title),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
-                }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // Secondary (skip)
-                TextButton(
-                    onClick = { viewModel.completeOnboarding() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
                     Text(
-                        text = stringResource(R.string.onboarding_skip),
+                        text = stringResource(R.string.onboarding_intro_long),
                         fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 19.sp
                     )
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Feature bullets
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        FeatureBullet(
+                            icon = Icons.Rounded.CloudSync,
+                            title = stringResource(R.string.onboarding_feature_backup_title),
+                            body = stringResource(R.string.onboarding_feature_backup_body)
+                        )
+                        FeatureBullet(
+                            icon = Icons.Rounded.Lock,
+                            title = stringResource(R.string.onboarding_feature_private_title),
+                            body = stringResource(R.string.onboarding_feature_private_body)
+                        )
+                        FeatureBullet(
+                            icon = Icons.Rounded.DevicesOther,
+                            title = stringResource(R.string.onboarding_feature_restore_title),
+                            body = stringResource(R.string.onboarding_feature_restore_body)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = stringResource(R.string.onboarding_drive_explain),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Primary action
+                    Button(
+                        onClick = { triggerGooglePicker() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFCA28),
+                            contentColor = Color(0xFF1A1A1A)
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.onboarding_connect_drive),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Secondary (skip)
+                    TextButton(
+                        onClick = { viewModel.completeOnboarding() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.onboarding_skip),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                        )
+                    }
+                }
             }
         }
     }
@@ -211,31 +223,32 @@ private fun FeatureBullet(
     Row(verticalAlignment = Alignment.Top) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(38.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFFFCA28).copy(alpha = 0.25f)),
+                .background(Color(0xFFFFCA28).copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = Color(0xFFFFCA28),
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = body,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
-                lineHeight = 16.sp
+                lineHeight = 15.sp
             )
         }
     }

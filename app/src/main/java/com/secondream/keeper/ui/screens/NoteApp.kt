@@ -198,13 +198,13 @@ fun NoteApp(viewModel: NoteViewModel) {
         Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
-                // Keep Style Top search header
-                Box(
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .fillMaxWidth()
-                        .padding(12.dp)
-                ) {
+                Column(modifier = Modifier.statusBarsPadding()) {
+                    // Keep Style Top search header
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -298,6 +298,10 @@ fun NoteApp(viewModel: NoteViewModel) {
                             }
                         }
                     }
+                }
+
+                    // Offline banner in-flow (no overlap with note cards)
+                    OfflineBanner(viewModel = viewModel)
                 }
             },
             bottomBar = {
@@ -480,22 +484,6 @@ fun NoteApp(viewModel: NoteViewModel) {
                     }
                 }
             }
-                // close AnimatedContent screen lambda
-
-                // Floating banners over the scaffold content
-                OfflineBanner(
-                    viewModel = viewModel,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = paddingValues.calculateTopPadding() + 4.dp)
-                )
-
-                UploadProgressBanner(
-                    viewModel = viewModel,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = paddingValues.calculateBottomPadding() + 8.dp)
-                )
             }   // close Box wrapper
         }
     }
