@@ -529,41 +529,85 @@ fun NoteDetailView(
                             Icon(Icons.Filled.Share, stringResource(R.string.share_note))
                         }
 
-                        // Pin — toggle, save & exit. Stays as plain top-bar icon
-                        // so it inherits contentColor (black on light, white on
-                        // dark) and is always readable.
-                        IconButton(onClick = {
-                            isPinned = !isPinned
-                            saveAndDismiss()
-                        }) {
+                        // Sync indicator — pulses when the current note is uploading
+                        val isUploading = note?.id?.let { id ->
+                            uploadingTasks.containsKey(id)
+                        } ?: false
+                        if (isUploading) {
+                            val infinite = androidx.compose.animation.core.rememberInfiniteTransition(
+                                label = "sync_pulse"
+                            )
+                            val pulseAlpha by infinite.animateFloat(
+                                initialValue = 0.4f,
+                                targetValue = 1f,
+                                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                    animation = androidx.compose.animation.core.tween(700),
+                                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                ),
+                                label = "sync_pulse_alpha"
+                            )
                             Icon(
-                                imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = stringResource(R.string.pin_tooltip)
+                                imageVector = Icons.Outlined.CloudSync,
+                                contentDescription = "Salvataggio in corso",
+                                tint = contentColor.copy(alpha = pulseAlpha),
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .size(22.dp)
                             )
                         }
 
-                        if (note != null) {
-                            // Archive — toggle & exit
+                        if (note != null && note.isTrashed) {
+                            // Trash mode: Restore + Delete forever
                             IconButton(onClick = {
-                                if (note.isArchived) viewModel.unarchiveNote(note.id)
-                                else viewModel.archiveNote(note.id)
+                                viewModel.restoreNote(note.id)
                                 onDismiss()
                             }) {
                                 Icon(
-                                    imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                                    contentDescription = if (note.isArchived)
-                                        stringResource(R.string.unarchive_note)
-                                    else
-                                        stringResource(R.string.archive_tooltip)
+                                    imageVector = Icons.Outlined.RestoreFromTrash,
+                                    contentDescription = "Ripristina nota"
+                                )
+                            }
+                            IconButton(onClick = { showDeleteConfirm = true }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteForever,
+                                    contentDescription = "Elimina definitivamente"
+                                )
+                            }
+                        } else {
+                            // Pin — toggle, save & exit
+                            IconButton(onClick = {
+                                isPinned = !isPinned
+                                saveAndDismiss()
+                            }) {
+                                Icon(
+                                    imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                    contentDescription = stringResource(R.string.pin_tooltip)
                                 )
                             }
 
-                            // Delete — confirm then trash & exit
-                            IconButton(onClick = { showDeleteConfirm = true }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Delete,
-                                    contentDescription = stringResource(R.string.trash_tooltip)
-                                )
+                            if (note != null) {
+                                // Archive — toggle & exit
+                                IconButton(onClick = {
+                                    if (note.isArchived) viewModel.unarchiveNote(note.id)
+                                    else viewModel.archiveNote(note.id)
+                                    onDismiss()
+                                }) {
+                                    Icon(
+                                        imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                                        contentDescription = if (note.isArchived)
+                                            stringResource(R.string.unarchive_note)
+                                        else
+                                            stringResource(R.string.archive_tooltip)
+                                    )
+                                }
+
+                                // Delete — confirm then trash & exit
+                                IconButton(onClick = { showDeleteConfirm = true }) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Delete,
+                                        contentDescription = stringResource(R.string.trash_tooltip)
+                                    )
+                                }
                             }
                         }
                     }
@@ -574,19 +618,29 @@ fun NoteDetailView(
         ) { padding ->
             // Delete confirmation
             if (showDeleteConfirm && note != null) {
+                val isTrashedNote = note.isTrashed
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirm = false },
                     title = {
-                        Text("Eliminare la nota?", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isTrashedNote) "Eliminare definitivamente?" else "Eliminare la nota?",
+                            fontWeight = FontWeight.Bold
+                        )
                     },
                     text = {
-                        Text("La nota verrà spostata nel cestino. Puoi recuperarla finché non svuoti il cestino.")
+                        Text(
+                            if (isTrashedNote)
+                                "La nota verrà rimossa dal telefono e dal Drive. Questa azione è irreversibile."
+                            else
+                                "La nota verrà spostata nel cestino. Puoi recuperarla finché non svuoti il cestino."
+                        )
                     },
                     confirmButton = {
                         Button(
                             onClick = {
                                 showDeleteConfirm = false
-                                viewModel.trashNote(note.id)
+                                if (isTrashedNote) viewModel.deleteNotePermanently(note)
+                                else viewModel.trashNote(note.id)
                                 onDismiss()
                             },
                             colors = ButtonDefaults.buttonColors(
@@ -594,7 +648,7 @@ fun NoteDetailView(
                                 contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(12.dp)
-                        ) { Text("Elimina", fontWeight = FontWeight.Bold) }
+                        ) { Text(if (isTrashedNote) "Elimina" else "Sposta", fontWeight = FontWeight.Bold) }
                     },
                     dismissButton = {
                         TextButton(onClick = { showDeleteConfirm = false }) {
@@ -823,36 +877,6 @@ fun NoteDetailView(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                // No more bulky "ELEMENTI CHECKLIST (N)" header — let
-                                // the list speak for itself. Only a small "convert"
-                                // icon-button in the top-end corner when items exist.
-                                if (checklistItems.isNotEmpty()) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                val checklistText = checklistItems.joinToString("\n") { item ->
-                                                    if (item.checked) "• [x] ${item.text}" else "• [ ] ${item.text}"
-                                                }
-                                                content = if (content.isNotBlank()) "$content\n\n$checklistText" else checklistText
-                                                checklistItems = emptyList()
-                                                isChecklistActive = false
-                                            },
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.TextFields,
-                                                contentDescription = stringResource(R.string.convert_to_text),
-                                                tint = contentColor.copy(alpha = 0.55f),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
                                 // Render dynamic editable checklist list
                                 Column {
                                     checklistItems.forEachIndexed { idx, item ->

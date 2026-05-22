@@ -1,5 +1,6 @@
 package com.secondream.keeper
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -71,6 +72,10 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             android.util.Log.w("KeeperLifecycle", "enableEdgeToEdge failed", e)
         }
+
+        // Widget deep link: open a specific note
+        handleNoteIntent(intent)
+
         setContent {
             android.util.Log.i("KeeperLifecycle", "setContent composing")
             val darkThemePref by viewModel.darkThemeOption.collectAsState()
@@ -137,6 +142,22 @@ class MainActivity : ComponentActivity() {
                     AccountSwitchDialog(viewModel = viewModel)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNoteIntent(intent)
+    }
+
+    private fun handleNoteIntent(intent: Intent?) {
+        val noteId = intent?.getLongExtra(
+            com.secondream.keeper.widget.KeeperWidgetProvider.EXTRA_NOTE_ID,
+            -1L
+        ) ?: -1L
+        if (noteId > 0) {
+            viewModel.requestOpenNoteById(noteId)
         }
     }
 }

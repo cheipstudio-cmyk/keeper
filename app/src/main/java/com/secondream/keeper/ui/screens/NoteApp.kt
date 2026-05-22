@@ -63,6 +63,16 @@ fun NoteApp(viewModel: NoteViewModel) {
     var isCreatingNewNote by remember { mutableStateOf(false) }
     var initialLaunchType by remember { mutableStateOf<String?>(null) }
 
+    // Widget deep-link: if a note open is requested from outside, show it
+    val openNoteRequest by viewModel.openNoteRequest.collectAsState()
+    LaunchedEffect(openNoteRequest) {
+        val note = openNoteRequest
+        if (note != null) {
+            selectedNoteForEdit = note
+            viewModel.clearOpenNoteRequest()
+        }
+    }
+
     // Intercept deletion confirmation dialog targets
     var noteToTrash by remember { mutableStateOf<Note?>(null) }
     var noteToDeletePermanently by remember { mutableStateOf<Note?>(null) }
@@ -472,43 +482,30 @@ fun NoteApp(viewModel: NoteViewModel) {
                             // In Trash screen: show a "Svuota cestino" CTA on top
                             if (screen is NavigationScreen.Trash) {
                                 var showEmptyTrashConfirm by remember { mutableStateOf(false) }
-                                Card(
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                                        .clickable { showEmptyTrashConfirm = true },
-                                    shape = RoundedCornerShape(14.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                                    )
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    TextButton(
+                                        onClick = { showEmptyTrashConfirm = true },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.DeleteSweep,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(22.dp)
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Svuota cestino",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = "Elimina definitivamente le note dal telefono e dal Drive",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                                                maxLines = 2
-                                            )
-                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Svuota cestino",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        )
                                     }
                                 }
 
@@ -900,7 +897,8 @@ fun NoteItemCard(
                     ),
                     maxLines = 6,
                     overflow = TextOverflow.Ellipsis,
-                    linkColor = MaterialTheme.colorScheme.primary
+                    linkColor = MaterialTheme.colorScheme.primary,
+                    onPlainClick = onClick
                 )
             }
 

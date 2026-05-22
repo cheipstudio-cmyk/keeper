@@ -82,6 +82,34 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     val defaultNoteColor = _defaultNoteColor.asStateFlow()
 
     private val _userName = MutableStateFlow(prefs.getString("user_name", "Explorer") ?: "Explorer")
+
+    // External requests to open a specific note (from widget tap).
+    // MainActivity drains this and triggers the detail dialog.
+    private val _openNoteRequest = MutableStateFlow<Note?>(null)
+    val openNoteRequest: StateFlow<Note?> = _openNoteRequest.asStateFlow()
+
+    private fun refreshWidgets() {
+        try {
+            com.secondream.keeper.widget.KeeperWidgetProvider.updateAll(
+                getApplication<Application>().applicationContext
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("Keeper", "Widget refresh failed", e)
+        }
+    }
+
+    fun requestOpenNoteById(noteId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val n = repository.getNoteByIdSync(noteId)
+                if (n != null) _openNoteRequest.value = n
+            } catch (e: Exception) {
+                android.util.Log.w("Keeper", "requestOpenNoteById failed", e)
+            }
+        }
+    }
+
+    fun clearOpenNoteRequest() { _openNoteRequest.value = null }
     val userName = _userName.asStateFlow()
 
     // Persistent set of user-created labels that may have no note yet.
@@ -263,6 +291,25 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             android.util.Log.e("Keeper", "Force update username failed", e)
+        }
+
+        // Recovery: re-upload notes whose last edit didn't finish syncing
+        // (user closed the app before the banner completed).
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                kotlinx.coroutines.delay(2500) // wait for connection/auth setup
+                if (_isGoogleConnected.value && _autoUploadEnabled.value && isOnline.value) {
+                    val pending = repository.getAllNotesSync().filter {
+                        !it.isTrashed && it.updatedAt > it.driveSyncedAt
+                    }
+                    if (pending.isNotEmpty()) {
+                        android.util.Log.i("Keeper", "Recovery upload: ${pending.size} pending notes")
+                        pending.forEach { note -> maybeAutoUploadNote(note.id) }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("Keeper", "Pending upload recovery failed", e)
+            }
         }
     }
 
@@ -1105,6 +1152,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             val newId = repository.insertNote(newNote)
             markNoteEditedForBanner(newId)
             maybeAutoUploadNote(newId)
+            refreshWidgets()
         }
     }
 
@@ -1113,6 +1161,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             repository.updateNote(note)
             markNoteEditedForBanner(note.id)
             maybeAutoUploadNote(note.id)
+            refreshWidgets()
         }
     }
 
@@ -1121,6 +1170,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.togglePin(noteId)
             maybeAutoUploadNote(noteId)
+            refreshWidgets()
         }
     }
 
@@ -1128,6 +1178,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.trashNote(noteId)
             maybeAutoUploadNote(noteId)
+            refreshWidgets()
         }
     }
 
@@ -1135,6 +1186,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.restoreNote(noteId)
             maybeAutoUploadNote(noteId)
+            refreshWidgets()
         }
     }
 
@@ -1142,6 +1194,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.archiveNote(noteId)
             maybeAutoUploadNote(noteId)
+            refreshWidgets()
         }
     }
 
@@ -1149,6 +1202,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.unarchiveNote(noteId)
             maybeAutoUploadNote(noteId)
+            refreshWidgets()
         }
     }
 
@@ -1156,6 +1210,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteNotePermanently(note)
             maybeDeleteNoteFolder(note.driveFolderId)
+            refreshWidgets()
         }
     }
 
@@ -1197,6 +1252,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             // Brief "done" state then hide
             kotlinx.coroutines.delay(700)
             _emptyTrashState.value = EmptyTrashState(active = false, processed = 0, total = 0)
+            refreshWidgets()
         }
     }
 }
