@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +30,7 @@ class MainActivity : FragmentActivity() {
         // Install the modern splash screen API. This shows the launcher icon
         // on the dark blue brand color while the first frame is being
         // prepared, then automatically fades into the app.
-        androidx.core.splashscreen.SplashScreen.installSplashScreen(this)
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         android.util.Log.i("KeeperLifecycle", "MainActivity.onCreate START")
 
