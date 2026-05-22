@@ -1159,14 +1159,44 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Progress state shown while emptying the trash (LOCAL + remote Drive).
+    data class EmptyTrashState(
+        val active: Boolean = false,
+        val processed: Int = 0,
+        val total: Int = 0
+    )
+    private val _emptyTrashState = MutableStateFlow(EmptyTrashState())
+    val emptyTrashState: StateFlow<EmptyTrashState> = _emptyTrashState.asStateFlow()
+
     fun emptyTrash() {
         viewModelScope.launch {
-            // Capture the trashed notes BEFORE deleting so we know their Drive folder IDs
-            val trashedBefore = repository.getTrashedNotesSync()
-            repository.emptyTrash()
-            trashedBefore.forEach { note ->
-                maybeDeleteNoteFolder(note.driveFolderId)
+            val trashedBefore = try {
+                repository.getTrashedNotesSync()
+            } catch (e: Exception) {
+                emptyList()
             }
+            val total = trashedBefore.size
+            _emptyTrashState.value = EmptyTrashState(active = true, processed = 0, total = total)
+
+            // Wipe locally first (instant)
+            try { repository.emptyTrash() } catch (e: Exception) { e.printStackTrace() }
+
+            // Then walk Drive folder deletions, advancing progress as we go
+            trashedBefore.forEachIndexed { index, note ->
+                try {
+                    maybeDeleteNoteFolder(note.driveFolderId)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                _emptyTrashState.value = EmptyTrashState(
+                    active = true,
+                    processed = index + 1,
+                    total = total
+                )
+            }
+            // Brief "done" state then hide
+            kotlinx.coroutines.delay(700)
+            _emptyTrashState.value = EmptyTrashState(active = false, processed = 0, total = 0)
         }
     }
 }

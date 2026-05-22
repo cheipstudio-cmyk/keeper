@@ -58,6 +58,23 @@ private val LightColorScheme =
     onError = Color(0xFFFFFFFF)
   )
 
+/**
+ * Adjusts an accent so it stays readable on a near-white background.
+ * Computes perceived luminance; if too light, darkens proportionally.
+ */
+private fun Color.adjustedForLightTheme(): Color {
+    val luminance = 0.299f * red + 0.587f * green + 0.114f * blue
+    return if (luminance > 0.62f) {
+        val factor = 0.52f
+        Color(
+            red = (red * factor).coerceIn(0f, 1f),
+            green = (green * factor).coerceIn(0f, 1f),
+            blue = (blue * factor).coerceIn(0f, 1f),
+            alpha = alpha
+        )
+    } else this
+}
+
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
@@ -78,10 +95,6 @@ fun MyApplicationTheme(
       else -> LightColorScheme
     }
 
-  // Override primary + primaryContainer with the user's chosen accent.
-  // In light theme we keep the dark "primary" text color the same — only
-  // primaryContainer (the FAB / bottoni evidenziati) and the accent slot
-  // become the chosen color.
   val colorScheme =
     if (accentColor != null) {
       if (darkTheme) {
@@ -92,11 +105,14 @@ fun MyApplicationTheme(
           onPrimaryContainer = Color(0xFF1F1F1F)
         )
       } else {
+        // Auto-darken pastel accents (Keep yellow, etc.) so they stay
+        // legible on a near-white background instead of disappearing.
+        val effective = accentColor.adjustedForLightTheme()
         baseScheme.copy(
-          primary = accentColor,
-          primaryContainer = accentColor,
-          onPrimary = Color(0xFF1A1A1A),
-          onPrimaryContainer = Color(0xFF1A1A1A)
+          primary = effective,
+          primaryContainer = effective,
+          onPrimary = Color(0xFFFFFFFF),
+          onPrimaryContainer = Color(0xFFFFFFFF)
         )
       }
     } else baseScheme

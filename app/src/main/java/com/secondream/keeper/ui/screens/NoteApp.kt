@@ -468,14 +468,91 @@ fun NoteApp(viewModel: NoteViewModel) {
                         val pinnedList = filteredNotes.filter { it.isPinned }
                         val othersList = filteredNotes.filter { !it.isPinned }
 
-                        androidx.compose.animation.Crossfade(
-                            targetState = isGridView,
-                            animationSpec = androidx.compose.animation.core.tween(durationMillis = 320),
-                            label = "grid_list_switch"
-                        ) { grid ->
-                        if (grid) {
-                            // Render Stunning staggered grid
-                            LazyVerticalStaggeredGrid(
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // In Trash screen: show a "Svuota cestino" CTA on top
+                            if (screen is NavigationScreen.Trash) {
+                                var showEmptyTrashConfirm by remember { mutableStateOf(false) }
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        .clickable { showEmptyTrashConfirm = true },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.DeleteSweep,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Svuota cestino",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "Elimina definitivamente le note dal telefono e dal Drive",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                                                maxLines = 2
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (showEmptyTrashConfirm) {
+                                    AlertDialog(
+                                        onDismissRequest = { showEmptyTrashConfirm = false },
+                                        title = { Text("Svuotare il cestino?", fontWeight = FontWeight.Bold) },
+                                        text = {
+                                            Text(
+                                                "Tutte le ${filteredNotes.size} note nel cestino verranno eliminate definitivamente dal telefono e dal tuo Drive. Questa azione è irreversibile."
+                                            )
+                                        },
+                                        confirmButton = {
+                                            Button(
+                                                onClick = {
+                                                    showEmptyTrashConfirm = false
+                                                    viewModel.emptyTrash()
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.error,
+                                                    contentColor = Color.White
+                                                ),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) { Text("Svuota", fontWeight = FontWeight.Bold) }
+                                        },
+                                        dismissButton = {
+                                            TextButton(onClick = { showEmptyTrashConfirm = false }) {
+                                                Text("Annulla")
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(22.dp)
+                                    )
+                                }
+                            }
+
+                            androidx.compose.animation.Crossfade(
+                                targetState = isGridView,
+                                animationSpec = androidx.compose.animation.core.tween(durationMillis = 320),
+                                label = "grid_list_switch",
+                                modifier = Modifier.weight(1f)
+                            ) { grid ->
+                            if (grid) {
+                                // Render Stunning staggered grid
+                                LazyVerticalStaggeredGrid(
                                 columns = StaggeredGridCells.Fixed(2),
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -583,6 +660,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                             }
                         }
                         }  // close Crossfade lambda
+                        }  // close Column wrapper (trash CTA + notes)
                     }
                 }
             }
@@ -602,6 +680,20 @@ fun NoteApp(viewModel: NoteViewModel) {
                             .padding(end = 80.dp, bottom = 8.dp)
                     )
                 }
+            }
+            // Empty-trash progress banner (active only on Trash screen during wipe)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.BottomStart
+            ) {
+                EmptyTrashBanner(
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(start = 8.dp, bottom = 60.dp)
+                )
             }
         }
     }
@@ -783,14 +875,13 @@ fun NoteItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End
                 ) {
-                    IconButton(
-                        onClick = onPinClick,
-                        modifier = Modifier.size(24.dp)
-                    ) {
+                    // Pin shown as a small read-only indicator only when active.
+                    // Toggling pin happens inside the note editor.
+                    if (note.isPinned) {
                         Icon(
-                            imageVector = if (note.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                            contentDescription = "Pin notes",
-                            tint = if (note.isPinned) Color(0xFFFF9100) else contentColor.copy(alpha = 0.4f),
+                            imageVector = Icons.Filled.PushPin,
+                            contentDescription = "Bloccata",
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -919,41 +1010,8 @@ fun NoteItemCard(
                 }
             }
 
-            // Quick hover utility bar (Delete / Trash, Archive)
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Archive / Unarchive icon
-                IconButton(
-                    onClick = onArchiveClick,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                        contentDescription = if (note.isArchived) "Sposta nelle note" else "Archivia",
-                        tint = contentColor.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Delete trash icon shortcut
-                IconButton(
-                    onClick = onTrashClick,
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Delete,
-                        contentDescription = "Trash Note",
-                        tint = contentColor.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+            // Card no longer holds archive/trash buttons — those actions live
+            // inside the note editor toolbar (top bar) for a cleaner card grid.
         }
     }
 }

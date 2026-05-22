@@ -495,6 +495,8 @@ fun NoteDetailView(
     }
 
     val focusManager = LocalFocusManager.current
+    val accentChipColor = MaterialTheme.colorScheme.primary
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -513,15 +515,7 @@ fun NoteDetailView(
                         }
                     },
                     actions = {
-                        // Pin Toggle icon
-                        IconButton(onClick = { isPinned = !isPinned }) {
-                            Icon(
-                                imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = stringResource(R.string.pin_tooltip)
-                            )
-                        }
-
-                        // Share note (text + attachments)
+                        // Share button stays as a plain icon (frequent action)
                         IconButton(onClick = {
                             val paths = allAttachments
                                 .map { it.uri }
@@ -536,21 +530,51 @@ fun NoteDetailView(
                             Icon(Icons.Filled.Share, stringResource(R.string.share_note))
                         }
 
-                        // Archive / Unarchive toggle (for existing notes)
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        // Pin chip — toggles pin, persists, and exits the note
+                        ToolbarChip(
+                            icon = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                            tint = accentChipColor,
+                            contentDescription = stringResource(R.string.pin_tooltip),
+                            onClick = {
+                                isPinned = !isPinned
+                                // Persist via saveAndDismiss so the change goes
+                                // through the normal update path, and exit
+                                saveAndDismiss()
+                            },
+                            active = isPinned
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Archive chip — only meaningful on existing notes
                         if (note != null) {
-                            IconButton(onClick = {
-                                if (note.isArchived) viewModel.unarchiveNote(note.id)
-                                else viewModel.archiveNote(note.id)
-                                onDismiss()
-                            }) {
-                                Icon(
-                                    imageVector = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                                    contentDescription = if (note.isArchived)
-                                        stringResource(R.string.unarchive_note)
-                                    else
-                                        stringResource(R.string.archive_tooltip)
-                                )
-                            }
+                            ToolbarChip(
+                                icon = if (note.isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                                tint = accentChipColor,
+                                contentDescription = if (note.isArchived)
+                                    stringResource(R.string.unarchive_note)
+                                else
+                                    stringResource(R.string.archive_tooltip),
+                                onClick = {
+                                    if (note.isArchived) viewModel.unarchiveNote(note.id)
+                                    else viewModel.archiveNote(note.id)
+                                    onDismiss()
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Delete chip — confirms then trashes & exits
+                            ToolbarChip(
+                                icon = Icons.Outlined.Delete,
+                                tint = accentChipColor,
+                                contentDescription = stringResource(R.string.delete_tooltip),
+                                onClick = { showDeleteConfirm = true }
+                            )
+
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
                     }
                 )
@@ -558,6 +582,38 @@ fun NoteDetailView(
             containerColor = cardBackground,
             contentColor = contentColor
         ) { padding ->
+            // Delete confirmation
+            if (showDeleteConfirm && note != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirm = false },
+                    title = {
+                        Text("Eliminare la nota?", fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Text("La nota verrà spostata nel cestino. Puoi recuperarla finché non svuoti il cestino.")
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showDeleteConfirm = false
+                                viewModel.trashNote(note.id)
+                                onDismiss()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Elimina", fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirm = false }) {
+                            Text("Annulla")
+                        }
+                    },
+                    shape = RoundedCornerShape(22.dp)
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
