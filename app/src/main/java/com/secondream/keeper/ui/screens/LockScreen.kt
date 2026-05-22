@@ -32,54 +32,70 @@ fun LockScreen(viewModel: NoteViewModel) {
     var authError by remember { mutableStateOf<String?>(null) }
     var isPrompting by remember { mutableStateOf(false) }
 
-    fun showPrompt() {
-        val activity = context as? FragmentActivity
-        if (activity == null) {
-            authError = "Errore interno (Activity non disponibile)"
-            return
-        }
-        val executor = ContextCompat.getMainExecutor(context)
-        val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Sblocca Keeper")
-            .setSubtitle("Usa l'impronta o il PIN del telefono")
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            )
-            .build()
+    val showPrompt: () -> Unit = remember {
+        {
+            val activity = context as? FragmentActivity
+            if (activity == null) {
+                authError = "Errore interno (Activity non disponibile)"
+            } else {
+                val executor = ContextCompat.getMainExecutor(context)
+                val info = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("Sblocca Keeper")
+                    .setSubtitle("Usa l'impronta o il PIN del telefono")
+                    .setAllowedAuthenticators(
+                        BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    )
+                    .build()
 
-        val prompt = BiometricPrompt(
-            activity,
-            executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    isPrompting = false
-                    viewModel.unlockApp()
-                }
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    isPrompting = false
-                    // Don't surface "user canceled" — let them retry from the button
-                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
-                        errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                        authError = errString.toString()
+                val prompt = BiometricPrompt(
+                    activity,
+                    executor,
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            isPrompting = false
+                            viewModel.unlockApp()
+                        }
+                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                            isPrompting = false
+                            if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                                errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                                errorCode != BiometricPrompt.ERROR_CANCELED) {
+                                authError = errString.toString()
+                            }
+                        }
+                        override fun onAuthenticationFailed() {}
                     }
-                }
-                override fun onAuthenticationFailed() {
-                    // wrong fingerprint — let prompt continue, don't dismiss
+                )
+                isPrompting = true
+                try {
+                    prompt.authenticate(info)
+                } catch (e: Exception) {
+                    isPrompting = false
+                    authError = e.message ?: "Errore di autenticazione"
                 }
             }
-        )
-        isPrompting = true
-        try {
-            prompt.authenticate(info)
-        } catch (e: Exception) {
-            isPrompting = false
-            authError = e.message ?: "Errore di autenticazione"
         }
     }
 
-    // Auto-show the prompt the very first time the lock screen appears
-    LaunchedEffect(Unit) { showPrompt() }
+    // Re-trigger the prompt every time the screen enters foreground and
+    // reset isPrompting so the button isn't stuck disabled if Android
+    // silently cancels the prompt while we're in background.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isPrompting = false
+                authError = null
+                showPrompt()
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                // Prompt is dismissed by the system when activity pauses
+                isPrompting = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -135,9 +151,12 @@ fun LockScreen(viewModel: NoteViewModel) {
             Button(
                 onClick = {
                     authError = null
+                    // Reset isPrompting in case it got stuck (e.g. Android
+                    // silently cancelled the prompt). Force-relaunch.
+                    isPrompting = false
                     showPrompt()
                 },
-                enabled = !isPrompting,
+                enabled = true,
                 shape = RoundedCornerShape(14.dp),
                 contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp)
             ) {

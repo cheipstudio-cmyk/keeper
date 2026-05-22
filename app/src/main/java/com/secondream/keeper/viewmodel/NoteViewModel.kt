@@ -92,6 +92,13 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLocked = MutableStateFlow(prefs.getBoolean("app_lock_enabled", false))
     val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
 
+    // Set right before opening a system picker (photo / file / audio / etc).
+    // The next onStop() will NOT re-lock the app — otherwise every time the
+    // user picked a file the lock screen would reappear on return.
+    fun markSystemPickerAboutToOpen() {
+        com.secondream.keeper.KeeperApplication.skipNextLock = true
+    }
+
     fun setAppLockEnabled(enabled: Boolean) {
         _appLockEnabled.value = enabled
         prefs.edit().putBoolean("app_lock_enabled", enabled).apply()
@@ -100,6 +107,12 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun lockApp() {
+        if (com.secondream.keeper.KeeperApplication.skipNextLock) {
+            // User just opened a system picker (file, photo, share, URL).
+            // Don't re-lock when they come back. Reset the flag.
+            com.secondream.keeper.KeeperApplication.skipNextLock = false
+            return
+        }
         if (_appLockEnabled.value) _isLocked.value = true
     }
 
@@ -358,7 +371,8 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDarkThemeOption(option: String) {
         _darkThemeOption.value = option
-        prefs.edit().putString("dark_theme", option).apply()
+        // commit() (synchronous) so refreshWidgets reads the new value
+        prefs.edit().putString("dark_theme", option).commit()
         refreshWidgets()
     }
 
@@ -1187,6 +1201,58 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeTempAttachment(attId: String) {
         _tempAttachments.update { list -> list.filter { it.id != attId } }
+    }
+
+    /**
+     * Remove a saved attachment from a note: delete the local file, trash
+     * the corresponding Drive file (in the note's Drive folder), and clear
+     * it out of the note's attachmentsJson. The caller (UI) is responsible
+     * for updating its in-memory list of attachments shown in the editor.
+     */
+    fun removeSavedAttachment(noteId: Long, att: com.secondream.keeper.data.model.Attachment) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 1. Delete the local file (if it is a local path)
+                val uri = att.uri
+                try {
+                    if (uri.startsWith("file://")) {
+                        val path = android.net.Uri.parse(uri).path
+                        if (path != null) java.io.File(path).delete()
+                    } else if (uri.startsWith("/")) {
+                        java.io.File(uri).delete()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("Keeper", "Local file delete failed", e)
+                }
+
+                // 2. Delete from Drive (best-effort)
+                try {
+                    val note = repository.getNoteByIdSync(noteId)
+                    val email = _googleEmail.value
+                    val folderId = note?.driveFolderId
+                    if (_isGoogleConnected.value && email.isNotBlank() &&
+                        !folderId.isNullOrBlank() && isOnline.value) {
+                        driveRepo.deleteAttachmentFromDrive(email, folderId, att)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("Keeper", "Drive attachment delete failed", e)
+                }
+
+                // 3. Persist the new attachment list in the DB so subsequent
+                //    auto-uploads of this note don't re-upload the removed
+                //    binary. The UI also strips it from its in-memory list,
+                //    so saveAndDismiss will write the correct JSON.
+                val note = repository.getNoteByIdSync(noteId) ?: return@launch
+                val newList = note.getAttachments().filter { it.id != att.id }
+                val updated = note.copy(
+                    attachmentsJson = com.secondream.keeper.data.model.Attachment.toJsonArray(newList),
+                    updatedAt = System.currentTimeMillis()
+                )
+                repository.updateNote(updated)
+            } catch (e: Exception) {
+                android.util.Log.e("Keeper", "removeSavedAttachment failed", e)
+            }
+        }
     }
 
     // Persistent Note CRUD Actions

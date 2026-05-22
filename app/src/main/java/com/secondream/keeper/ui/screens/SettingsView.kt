@@ -86,6 +86,7 @@ fun SettingsView(
 
     val triggerGooglePicker = {
         try {
+            viewModel.markSystemPickerAboutToOpen()
             val intent = AccountManager.newChooseAccountIntent(
                 null,
                 null,

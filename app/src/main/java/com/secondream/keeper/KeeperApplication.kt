@@ -29,4 +29,14 @@ class KeeperApplication : Application() {
             previousHandler?.uncaughtException(thread, throwable)
         }
     }
+
+    companion object {
+        /**
+         * Set to true right before opening any system picker / chooser /
+         * external intent (file, share, open URL, account chooser, etc.) so
+         * the upcoming onStop() doesn't re-lock the app.
+         */
+        @Volatile
+        var skipNextLock: Boolean = false
+    }
 }

@@ -55,7 +55,24 @@ class KeeperWidgetProvider : AppWidgetProvider() {
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            val views = RemoteViews(context.packageName, R.layout.widget_keeper)
+            // Match the app's theme preference (system / light / dark)
+            val appPrefs = context.getSharedPreferences("keep_notes_prefs", Context.MODE_PRIVATE)
+            val themePref = appPrefs.getString("dark_theme", "system") ?: "system"
+            val systemNight = (context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val isDark = when (themePref) {
+                "dark" -> true
+                "light" -> false
+                else -> systemNight
+            }
+
+            // Use a dedicated layout per theme — more reliable than trying
+            // to swap backgrounds at runtime through RemoteViews (which is
+            // restricted on older Android versions).
+            val layoutRes = if (isDark) R.layout.widget_keeper_dark else R.layout.widget_keeper
+            val views = RemoteViews(context.packageName, layoutRes)
+
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val raw = prefs.getString(keyForWidget(appWidgetId), "") ?: ""
             val noteIds = raw.split(",")

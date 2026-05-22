@@ -90,6 +90,7 @@ object FileOpener {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
+            com.secondream.keeper.KeeperApplication.skipNextLock = true
             context.startActivity(chooser)
             true
         } catch (e: Exception) {
@@ -151,6 +152,7 @@ object FileOpener {
             val chooser = Intent.createChooser(intent, "Condividi nota").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            com.secondream.keeper.KeeperApplication.skipNextLock = true
             context.startActivity(chooser)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -165,6 +167,7 @@ object FileOpener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            com.secondream.keeper.KeeperApplication.skipNextLock = true
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()

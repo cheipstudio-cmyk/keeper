@@ -66,6 +66,7 @@ fun OnboardingDialog(
         if (!hasLaunchedPicker) {
             hasLaunchedPicker = true
             try {
+                viewModel.markSystemPickerAboutToOpen()
                 val intent = AccountManager.newChooseAccountIntent(
                     null, null, arrayOf("com.google"), null, null, null, null
                 )

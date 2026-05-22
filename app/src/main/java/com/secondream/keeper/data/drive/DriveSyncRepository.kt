@@ -373,6 +373,29 @@ class DriveSyncRepository(
         return "${prefix}_${att.id.take(8)}_$safeName"
     }
 
+    /**
+     * Remove an attachment's binary from Drive. Locates the file inside the
+     * note's Drive folder by computed name and trashes it. No-op if the note
+     * has no Drive folder yet, or the file isn't there.
+     */
+    suspend fun deleteAttachmentFromDrive(
+        accountName: String,
+        driveFolderId: String,
+        att: Attachment
+    ): Boolean {
+        if (driveFolderId.isBlank()) return false
+        val listing = when (val r = drive.listFolderContents(accountName, driveFolderId)) {
+            is DriveSync.Result.Success -> r.value
+            else -> return false
+        }
+        val targetName = driveFileNameFor(att)
+        val entry = listing.firstOrNull { it.name == targetName } ?: return false
+        return when (val r = drive.deleteResource(accountName, entry.id)) {
+            is DriveSync.Result.Success -> r.value
+            else -> false
+        }
+    }
+
     private fun resolveLocalFile(att: Attachment): File? {
         val uri = att.uri
         return try {

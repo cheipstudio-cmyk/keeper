@@ -101,6 +101,7 @@ private fun openUrl(ctx: Context, url: String) {
     try {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        com.secondream.keeper.KeeperApplication.skipNextLock = true
         ctx.startActivity(intent)
     } catch (e: Exception) {
         e.printStackTrace()

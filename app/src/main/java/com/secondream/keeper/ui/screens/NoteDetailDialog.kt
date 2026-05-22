@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
@@ -415,6 +416,7 @@ fun NoteDetailView(
             }
             "image" -> {
                 try {
+                    viewModel.markSystemPickerAboutToOpen()
                     imageLauncher.launch("image/*")
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -422,6 +424,7 @@ fun NoteDetailView(
             }
             "file" -> {
                 try {
+                    viewModel.markSystemPickerAboutToOpen()
                     fileLauncher.launch("*/*")
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -749,7 +752,13 @@ fun NoteDetailView(
                                             if (tempAttachments.contains(attachment)) {
                                                 viewModel.removeTempAttachment(attachment.id)
                                             } else {
+                                                // Update UI immediately
                                                 savedAttachments = savedAttachments.filter { it.id != attachment.id }
+                                                // Delete from Drive + local file in background.
+                                                // Only meaningful if this note has been saved (note != null).
+                                                if (note != null) {
+                                                    viewModel.removeSavedAttachment(note.id, attachment)
+                                                }
                                             }
                                         },
                                         modifier = Modifier
@@ -842,26 +851,67 @@ fun NoteDetailView(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    TextField(
-                        value = content,
-                        onValueChange = { content = it },
-                        placeholder = { Text(stringResource(R.string.content_placeholder), fontSize = 16.sp) },
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, color = contentColor),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = contentColor,
-                            unfocusedTextColor = contentColor,
-                            focusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
-                            unfocusedPlaceholderColor = contentColor.copy(alpha = 0.4f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 24.dp)
-                    )
+                    // Content: in "view" mode, render LinkifiedText so URLs
+                    // become clickable accent-colored links (same as cards).
+                    // Tap on plain text (or the body if content is empty)
+                    // switches to edit mode (regular TextField + focus).
+                    var isEditingContent by remember(note?.id) {
+                        mutableStateOf(content.isBlank())
+                    }
+                    val contentFocusRequester = remember { FocusRequester() }
+                    val accentColor = MaterialTheme.colorScheme.primary
+
+                    if (isEditingContent) {
+                        TextField(
+                            value = content,
+                            onValueChange = { content = it },
+                            placeholder = { Text(stringResource(R.string.content_placeholder), fontSize = 16.sp) },
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, color = contentColor),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = contentColor,
+                                unfocusedTextColor = contentColor,
+                                focusedPlaceholderColor = contentColor.copy(alpha = 0.4f),
+                                unfocusedPlaceholderColor = contentColor.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 24.dp)
+                                .focusRequester(contentFocusRequester)
+                                .onFocusChanged { st ->
+                                    // When the field loses focus, switch back
+                                    // to view-mode so links become clickable
+                                    if (!st.isFocused && content.isNotBlank()) {
+                                        isEditingContent = false
+                                    }
+                                }
+                        )
+                        LaunchedEffect(isEditingContent) {
+                            if (isEditingContent) {
+                                try { contentFocusRequester.requestFocus() } catch (_: Exception) {}
+                            }
+                        }
+                    } else {
+                        LinkifiedText(
+                            text = content,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp,
+                                color = contentColor
+                            ),
+                            linkColor = accentColor,
+                            onPlainClick = {
+                                isEditingContent = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp)
+                                .padding(bottom = 24.dp)
+                        )
+                    }
 
                     // Removed redundant Immagine/Allegato/Checklist chips
                     // (same actions already available in the bottom toolbar).
@@ -1413,14 +1463,17 @@ fun NoteDetailView(
                                 onDismiss = { showAttachmentMenu = false },
                                 onImage = {
                                     showAttachmentMenu = false
+                                    viewModel.markSystemPickerAboutToOpen()
                                     imageLauncher.launch("image/*")
                                 },
                                 onVideo = {
                                     showAttachmentMenu = false
+                                    viewModel.markSystemPickerAboutToOpen()
                                     videoLauncher.launch("video/*")
                                 },
                                 onFile = {
                                     showAttachmentMenu = false
+                                    viewModel.markSystemPickerAboutToOpen()
                                     fileLauncher.launch("*/*")
                                 }
                             )
