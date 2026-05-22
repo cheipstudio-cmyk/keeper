@@ -853,8 +853,11 @@ fun NoteDetailView(
 
                     // Content: in "view" mode, render LinkifiedText so URLs
                     // become clickable accent-colored links (same as cards).
-                    // Tap on plain text (or the body if content is empty)
-                    // switches to edit mode (regular TextField + focus).
+                    // Tap on plain text switches to edit mode (TextField).
+                    // Edit mode persists until the dialog is dismissed — no
+                    // auto-revert on focus loss (avoids a race where the
+                    // TextField's initial unfocused state would immediately
+                    // toggle us back before requestFocus() could fire).
                     var isEditingContent by remember(note?.id) {
                         mutableStateOf(content.isBlank())
                     }
@@ -882,18 +885,15 @@ fun NoteDetailView(
                                 .fillMaxWidth()
                                 .padding(bottom = 24.dp)
                                 .focusRequester(contentFocusRequester)
-                                .onFocusChanged { st ->
-                                    // When the field loses focus, switch back
-                                    // to view-mode so links become clickable
-                                    if (!st.isFocused && content.isNotBlank()) {
-                                        isEditingContent = false
-                                    }
-                                }
                         )
-                        LaunchedEffect(isEditingContent) {
-                            if (isEditingContent) {
-                                try { contentFocusRequester.requestFocus() } catch (_: Exception) {}
-                            }
+                        // Request focus on first entry into edit mode. A tiny
+                        // delay lets the TextField fully attach to the layout
+                        // tree before we ask the IME to open.
+                        LaunchedEffect(Unit) {
+                            try {
+                                kotlinx.coroutines.delay(80)
+                                contentFocusRequester.requestFocus()
+                            } catch (_: Exception) {}
                         }
                     } else {
                         LinkifiedText(
