@@ -105,14 +105,14 @@ fun OnboardingDialog(
                         .padding(horizontal = 32.dp, vertical = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Hero: real app icon, large
+                    // Hero: real app icon
                     Image(
-                        painter = painterResource(id = com.secondream.keeper.R.mipmap.ic_launcher_round),
+                        painter = painterResource(id = com.secondream.keeper.R.mipmap.ic_launcher),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(120.dp)
-                            .clip(CircleShape)
+                            .clip(RoundedCornerShape(28.dp))
                     )
 
                     Spacer(modifier = Modifier.height(28.dp))

@@ -41,6 +41,12 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE isTrashed = 1")
     suspend fun emptyTrash()
 
+    @Query("DELETE FROM notes")
+    suspend fun wipeAllNotes()
+
+    @Query("SELECT * FROM notes")
+    suspend fun getAllNotesSync(): List<Note>
+
     @Query("UPDATE notes SET driveFolderId = :folderId, driveSyncedAt = :syncedAt WHERE id = :noteId")
     suspend fun updateDriveFolder(noteId: Long, folderId: String?, syncedAt: Long)
 

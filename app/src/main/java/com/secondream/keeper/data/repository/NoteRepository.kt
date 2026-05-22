@@ -20,6 +20,21 @@ class NoteRepository(private val noteDao: NoteDao) {
         }.toSet()
     }
 
+    /**
+     * Remove a label string from every note's `labels` field. The notes
+     * themselves are kept; only the label association goes away.
+     */
+    suspend fun removeLabelFromAllNotes(labelName: String) {
+        val all = noteDao.getAllNotesSync()
+        all.forEach { n ->
+            val current = n.labels.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            if (current.contains(labelName)) {
+                val updated = current.filter { it != labelName }.joinToString(",")
+                noteDao.updateNote(n.copy(labels = updated, updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
     suspend fun insertNote(note: Note): Long {
         return noteDao.insertNote(note.copy(updatedAt = System.currentTimeMillis()))
     }
@@ -55,6 +70,10 @@ class NoteRepository(private val noteDao: NoteDao) {
 
     suspend fun emptyTrash() {
         noteDao.emptyTrash()
+    }
+
+    suspend fun wipeAllNotes() {
+        noteDao.wipeAllNotes()
     }
 
     suspend fun updateDriveFolder(noteId: Long, folderId: String?, syncedAt: Long) {

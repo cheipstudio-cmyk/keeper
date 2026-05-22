@@ -4,9 +4,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -137,27 +139,138 @@ fun NoteApp(viewModel: NoteViewModel) {
 
                 Divider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 24.dp))
 
-                // Dynamic Labels Drawer Items
-                if (allLabels.isNotEmpty()) {
+                // ─── Labels section ───
+                var showCreateLabelDialog by remember { mutableStateOf(false) }
+                var labelPendingDelete by remember { mutableStateOf<String?>(null) }
+
+                // Header row with "+" button to create a new label
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 28.dp, end = 16.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
                         text = stringResource(R.string.dynamic_labels_header),
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
-                    allLabels.forEach { label ->
+                    IconButton(
+                        onClick = { showCreateLabelDialog = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Crea etichetta",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                allLabels.forEach { label ->
+                    Box(
+                        modifier = Modifier
+                            .padding(NavigationDrawerItemDefaults.ItemPadding)
+                            .clip(RoundedCornerShape(28.dp))
+                            .combinedClickable(
+                                onClick = {
+                                    viewModel.navigateTo(NavigationScreen.Label(label))
+                                    scope.launch { drawerState.close() }
+                                },
+                                onLongClick = {
+                                    labelPendingDelete = label
+                                }
+                            )
+                    ) {
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Outlined.Label, label) },
                             label = { Text(label) },
-                            selected = currentScreen is NavigationScreen.Label && (currentScreen as NavigationScreen.Label).label == label,
+                            selected = currentScreen is NavigationScreen.Label &&
+                                       (currentScreen as NavigationScreen.Label).label == label,
                             onClick = {
                                 viewModel.navigateTo(NavigationScreen.Label(label))
                                 scope.launch { drawerState.close() }
-                            },
-                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            }
                         )
                     }
+                }
+
+                if (allLabels.isNotEmpty()) {
                     Divider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 24.dp))
+                }
+
+                // Create label dialog
+                if (showCreateLabelDialog) {
+                    var newLabelText by remember { mutableStateOf("") }
+                    AlertDialog(
+                        onDismissRequest = { showCreateLabelDialog = false },
+                        title = { Text("Nuova etichetta", fontWeight = FontWeight.Bold) },
+                        text = {
+                            OutlinedTextField(
+                                value = newLabelText,
+                                onValueChange = { newLabelText = it },
+                                placeholder = { Text("Nome etichetta") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val trimmed = newLabelText.trim()
+                                    if (trimmed.isNotBlank()) {
+                                        viewModel.createEmptyLabel(trimmed)
+                                    }
+                                    showCreateLabelDialog = false
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Crea", fontWeight = FontWeight.Bold) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showCreateLabelDialog = false }) {
+                                Text("Annulla")
+                            }
+                        },
+                        shape = RoundedCornerShape(22.dp)
+                    )
+                }
+
+                // Delete label confirmation
+                labelPendingDelete?.let { lbl ->
+                    AlertDialog(
+                        onDismissRequest = { labelPendingDelete = null },
+                        title = { Text("Eliminare etichetta?", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text(
+                                "L'etichetta \"$lbl\" verrà rimossa da tutte le note. Le note non saranno cancellate."
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    viewModel.deleteLabel(lbl)
+                                    labelPendingDelete = null
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Elimina", fontWeight = FontWeight.Bold) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { labelPendingDelete = null }) {
+                                Text("Annulla")
+                            }
+                        },
+                        shape = RoundedCornerShape(22.dp)
+                    )
                 }
 
                 NavigationDrawerItem(
@@ -305,52 +418,41 @@ fun NoteApp(viewModel: NoteViewModel) {
                 }
             },
             bottomBar = {
-                // Show bottom edit drawer trigger bar only on notes screen to resemble Keep's bottom bar perfectly
                 if (currentScreen is NavigationScreen.Notes) {
-                    val activeNotesList by viewModel.activeNotes.collectAsState(emptyList())
                     Column {
                         // Short banner shown briefly after a successful auto-sync
                         EditSyncedBanner(viewModel = viewModel)
-                        BottomAppBar(
-                        actions = {
-                            Text(
-                                text = if (activeNotesList.isEmpty()) "Nessuna nota presente" else "${activeNotesList.size} " + (if (activeNotesList.size == 1) "nota" else "note"),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (themeIsDark) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else Color(0xFF0F172A).copy(alpha = 0.6f),
-                                    letterSpacing = 0.2.sp
-                                ),
-                                modifier = Modifier.padding(start = 16.dp)
-                            )
-                        },
-                        floatingActionButton = {
-                            FloatingActionButton(
-                                onClick = { isCreatingNewNote = true },
-                                containerColor = Color(0xFFFFCA28),
-                                contentColor = Color(0xFF1A1A1A),
-                                shape = RoundedCornerShape(20.dp),
-                                elevation = FloatingActionButtonDefaults.elevation(
-                                    defaultElevation = 8.dp,
-                                    pressedElevation = 14.dp
-                                ),
-                                modifier = Modifier.size(68.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = stringResource(R.string.take_note),
-                                    modifier = Modifier.size(34.dp)
-                                )
-                            }
-                        },
-                        modifier = Modifier
+                        // No bulky bottom app bar. Just leave room for the nav bar.
+                        Spacer(modifier = Modifier
                             .navigationBarsPadding()
-                            .height(84.dp),
-                        containerColor = if (themeIsDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFF2F4FC),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    )
+                            .height(0.dp))
                     }
                 }
-            }
+            },
+            floatingActionButton = {
+                if (currentScreen is NavigationScreen.Notes) {
+                    FloatingActionButton(
+                        onClick = { isCreatingNewNote = true },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = RoundedCornerShape(18.dp),
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 6.dp,
+                            pressedElevation = 12.dp
+                        ),
+                        modifier = Modifier
+                            .navigationBarsPadding()
+                            .size(58.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = stringResource(R.string.take_note),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            },
+            floatingActionButtonPosition = androidx.compose.material3.FabPosition.End,
         ) { paddingValues ->
             Box(modifier = Modifier.fillMaxSize()) {
                 AnimatedContent(
@@ -376,7 +478,12 @@ fun NoteApp(viewModel: NoteViewModel) {
                         val pinnedList = filteredNotes.filter { it.isPinned }
                         val othersList = filteredNotes.filter { !it.isPinned }
 
-                        if (isGridView) {
+                        androidx.compose.animation.Crossfade(
+                            targetState = isGridView,
+                            animationSpec = androidx.compose.animation.core.tween(durationMillis = 320),
+                            label = "grid_list_switch"
+                        ) { grid ->
+                        if (grid) {
                             // Render Stunning staggered grid
                             LazyVerticalStaggeredGrid(
                                 columns = StaggeredGridCells.Fixed(2),
@@ -485,6 +592,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                                 }
                             }
                         }
+                        }  // close Crossfade lambda
                     }
                 }
             }

@@ -11,7 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,37 +21,28 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondream.keeper.viewmodel.NoteViewModel
-import kotlinx.coroutines.delay
 
 /**
- * Tiny short-lived banner shown at the bottom of the home screen when
- * an auto-sync completes successfully. Cloud icon + "Modifica salvata
- * su Drive" + fast progress bar. No pause/close buttons — fully automatic.
+ * Bottom banner tied to REAL upload progress. Surfaces only after a user
+ * edit (text/checklist/attachment changes) — pin/archive/color tweaks don't
+ * trigger it. Two phases:
+ *   SYNCING — animated linear progress driven by upload bytes
+ *   DONE — full bar + check icon, auto-dismissed after a brief moment
  */
 @Composable
 fun EditSyncedBanner(viewModel: NoteViewModel, modifier: Modifier = Modifier) {
-    val visible by viewModel.editSyncedBanner.collectAsState()
+    val banner by viewModel.editBanner.collectAsState()
 
-    // Animate a fake fast progress (0 → 1 in ~1.8s) so the user sees movement
-    var progress by remember { mutableStateOf(0f) }
-    LaunchedEffect(visible) {
-        if (visible) {
-            progress = 0f
-            val steps = 36
-            for (i in 1..steps) {
-                delay(50)
-                progress = i / steps.toFloat()
-            }
-        }
-    }
+    val visible = banner.phase != NoteViewModel.EditBannerPhase.HIDDEN
+    val isDone = banner.phase == NoteViewModel.EditBannerPhase.DONE
+
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(160),
+        targetValue = banner.progress,
+        animationSpec = tween(220),
         label = "edit_sync_progress"
     )
 
@@ -71,14 +63,15 @@ fun EditSyncedBanner(viewModel: NoteViewModel, modifier: Modifier = Modifier) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Rounded.CloudDone,
+                        imageVector = if (isDone) Icons.Rounded.Check else Icons.Rounded.CloudUpload,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Modifica salvata su Drive",
+                        text = if (isDone) "Modifica salvata su Drive"
+                               else "Salvataggio su Drive in corso",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface

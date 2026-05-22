@@ -75,6 +75,38 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _userName = MutableStateFlow(prefs.getString("user_name", "Explorer") ?: "Explorer")
     val userName = _userName.asStateFlow()
 
+    // Persistent set of user-created labels that may have no note yet.
+    // Merged with notes' label strings to build the full label list.
+    private val _extraLabels = MutableStateFlow(
+        prefs.getStringSet("extra_labels", emptySet())?.toSet() ?: emptySet()
+    )
+
+    fun createEmptyLabel(name: String) {
+        val cleaned = name.trim()
+        if (cleaned.isBlank()) return
+        val newSet = _extraLabels.value + cleaned
+        _extraLabels.value = newSet
+        prefs.edit().putStringSet("extra_labels", newSet).apply()
+    }
+
+    fun deleteLabel(name: String) {
+        viewModelScope.launch {
+            try {
+                val newSet = _extraLabels.value - name
+                _extraLabels.value = newSet
+                prefs.edit().putStringSet("extra_labels", newSet).apply()
+                repository.removeLabelFromAllNotes(name)
+                // If we were currently viewing that label, go back to Notes
+                if (_currentScreen.value is NavigationScreen.Label &&
+                    (_currentScreen.value as NavigationScreen.Label).label == name) {
+                    _currentScreen.value = NavigationScreen.Notes
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     // Accent color (the Keep yellow by default). Persisted as a Long ARGB.
     private val _accentColorArgb = MutableStateFlow(
         prefs.getLong("accent_color_argb", 0xFFFFCA28L)
@@ -115,7 +147,10 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-        allLabels = repository.allExistingLabels.stateIn(
+        allLabels = combine(
+            repository.allExistingLabels,
+            _extraLabels
+        ) { dbLabels, extra -> (dbLabels + extra).toSet() }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptySet()
@@ -193,11 +228,13 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // On every startup, if the user is already connected to a Google
-        // account, force the display name to match it. This fixes stale
-        // "Eugenio Casale" left over from earlier app versions.
+        // account, force the display name to match it. Reads straight from
+        // prefs to avoid forward-reference on _googleEmail / _isGoogleConnected
+        // declared later in the class.
         try {
-            val connectedEmail = _googleEmail.value
-            if (_isGoogleConnected.value && connectedEmail.isNotBlank()) {
+            val connectedEmail = prefs.getString("google_email", "") ?: ""
+            val isConnected = prefs.getBoolean("google_connected", false)
+            if (isConnected && connectedEmail.isNotBlank()) {
                 forceUpdateUserNameFromEmail(connectedEmail)
             }
         } catch (e: Exception) {
@@ -409,16 +446,42 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _isConnectingAccount = MutableStateFlow(false)
     val isConnectingAccount: StateFlow<Boolean> = _isConnectingAccount.asStateFlow()
 
-    // Short-lived banner shown after an auto-sync completes successfully
-    private val _editSyncedBanner = MutableStateFlow(false)
-    val editSyncedBanner: StateFlow<Boolean> = _editSyncedBanner.asStateFlow()
+    // Edit-synced banner driven by REAL upload progress. Surfaces only when
+    // the user actually edits a note (saveNote/updateNote) — pin/archive/color
+    // changes don't pop the banner. Three phases:
+    //   SYNCING: live progress bar tied to the upload bytes
+    //   DONE:    full bar with check for ~1.2s
+    //   HIDDEN:  not shown
+    enum class EditBannerPhase { HIDDEN, SYNCING, DONE }
+    data class EditBannerState(
+        val phase: EditBannerPhase = EditBannerPhase.HIDDEN,
+        val progress: Float = 0f
+    )
+    private val _editBanner = MutableStateFlow(EditBannerState())
+    val editBanner: StateFlow<EditBannerState> = _editBanner.asStateFlow()
 
-    fun showEditSyncedBanner() {
+    // Note IDs that recently had a user-driven edit. The banner only shows
+    // when the next upload is for one of these notes.
+    private val pendingBannerNotes = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
+
+    internal fun markNoteEditedForBanner(noteId: Long) {
+        pendingBannerNotes.add(noteId)
+    }
+
+    private fun setBannerSyncing(progress: Float) {
+        _editBanner.value = EditBannerState(EditBannerPhase.SYNCING, progress)
+    }
+
+    private fun setBannerDone() {
         viewModelScope.launch {
-            _editSyncedBanner.value = true
-            kotlinx.coroutines.delay(2200)
-            _editSyncedBanner.value = false
+            _editBanner.value = EditBannerState(EditBannerPhase.DONE, 1f)
+            kotlinx.coroutines.delay(1300)
+            _editBanner.value = EditBannerState(EditBannerPhase.HIDDEN, 0f)
         }
+    }
+
+    private fun setBannerHidden() {
+        _editBanner.value = EditBannerState(EditBannerPhase.HIDDEN, 0f)
     }
 
     /**
@@ -754,23 +817,41 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                                         isPaused = _pausedNotes.value.contains(note.id)
                                     )
                                 )
+                                // Drive banner progress from real bytes if this
+                                // note was flagged as user-edited.
+                                if (pendingBannerNotes.contains(note.id) && total > 0) {
+                                    val p = (uploaded.toFloat() / total).coerceIn(0f, 1f)
+                                    setBannerSyncing(p)
+                                }
                             }
                         }
                     )
                     when (outcome) {
                         is DriveSyncRepository.SyncOutcome.Success -> {
                             repository.updateDriveFolder(note.id, outcome.folderId, System.currentTimeMillis())
-                            showEditSyncedBanner()
+                            if (pendingBannerNotes.contains(note.id)) {
+                                pendingBannerNotes.remove(note.id)
+                                setBannerDone()
+                            }
                         }
                         is DriveSyncRepository.SyncOutcome.NeedsUserAction -> {
                             _pendingAuthIntent.value = outcome.intent
+                            if (pendingBannerNotes.contains(note.id)) {
+                                pendingBannerNotes.remove(note.id)
+                                setBannerHidden()
+                            }
                         }
                         is DriveSyncRepository.SyncOutcome.Failure -> {
                             android.util.Log.w("DriveSync", "Auto-upload note $noteId: ${outcome.message}")
+                            if (pendingBannerNotes.contains(note.id)) {
+                                pendingBannerNotes.remove(note.id)
+                                setBannerHidden()
+                            }
                         }
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    pendingBannerNotes.remove(noteId)
                 } finally {
                     clearUploadProgress(noteId)
                 }
@@ -919,6 +1000,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                 attachmentsJson = attachmentsStr
             )
             val newId = repository.insertNote(newNote)
+            markNoteEditedForBanner(newId)
             maybeAutoUploadNote(newId)
         }
     }
@@ -926,6 +1008,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     fun updateNote(note: Note) {
         viewModelScope.launch {
             repository.updateNote(note)
+            markNoteEditedForBanner(note.id)
             maybeAutoUploadNote(note.id)
         }
     }
