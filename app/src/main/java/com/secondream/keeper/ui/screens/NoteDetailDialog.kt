@@ -42,6 +42,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
@@ -943,6 +945,7 @@ fun NoteDetailView(
                                     }
 
                                     // Quick Append Checklist Item
+                                    val newItemFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -968,6 +971,9 @@ fun NoteDetailView(
                                                     if (newChecklistItemText.isNotBlank()) {
                                                         checklistItems = checklistItems + ChecklistItem(newChecklistItemText)
                                                         newChecklistItemText = ""
+                                                        // Keep focus on this field so the user can keep adding items
+                                                        // without re-tapping the field
+                                                        try { newItemFocusRequester.requestFocus() } catch (_: Exception) {}
                                                     }
                                                 }
                                             ),
@@ -979,7 +985,9 @@ fun NoteDetailView(
                                                 focusedTextColor = contentColor,
                                                 unfocusedTextColor = contentColor
                                             ),
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .focusRequester(newItemFocusRequester)
                                         )
                                         IconButton(
                                             onClick = {
@@ -1431,45 +1439,29 @@ fun NoteDetailView(
 
                         // ATTACHMENT SIMULATED UPLOADS MENU
                         var showAttachmentMenu by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { showAttachmentMenu = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.AttachFile,
-                                    contentDescription = stringResource(R.string.attach_file_tooltip),
-                                    tint = contentColor
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = showAttachmentMenu,
-                                onDismissRequest = { showAttachmentMenu = false }
-                            ) {
-                                // 1. Real Picker Options
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.real_picker_image)) },
-                                    leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, "Img") },
-                                    onClick = {
-                                        showAttachmentMenu = false
-                                        imageLauncher.launch("image/*")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.real_picker_video)) },
-                                    leadingIcon = { Icon(Icons.Default.VideoCall, "Vid") },
-                                    onClick = {
-                                        showAttachmentMenu = false
-                                        videoLauncher.launch("video/*")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.real_picker_file)) },
-                                    leadingIcon = { Icon(Icons.Default.UploadFile, "Doc") },
-                                    onClick = {
-                                        showAttachmentMenu = false
-                                        fileLauncher.launch("*/*")
-                                    }
-                                )
-                            }
+                        IconButton(onClick = { showAttachmentMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.AttachFile,
+                                contentDescription = stringResource(R.string.attach_file_tooltip),
+                                tint = contentColor
+                            )
+                        }
+                        if (showAttachmentMenu) {
+                            AttachmentPickerSheet(
+                                onDismiss = { showAttachmentMenu = false },
+                                onImage = {
+                                    showAttachmentMenu = false
+                                    imageLauncher.launch("image/*")
+                                },
+                                onVideo = {
+                                    showAttachmentMenu = false
+                                    videoLauncher.launch("video/*")
+                                },
+                                onFile = {
+                                    showAttachmentMenu = false
+                                    fileLauncher.launch("*/*")
+                                }
+                            )
                         }
                     }
                 }

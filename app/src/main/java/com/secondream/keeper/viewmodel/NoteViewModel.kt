@@ -163,6 +163,23 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                 e.printStackTrace()
             }
         }
+
+        // One-time migration: legacy installs may have user_name_manual=true
+        // with no user_name_email associated, blocking the auto-derivation.
+        // Reset the flag so the next account connect re-derives the name.
+        if (!prefs.getBoolean("migration_v0_7_name", false)) {
+            val hasAssociatedEmail = !prefs.getString("user_name_email", "").isNullOrBlank()
+            if (!hasAssociatedEmail) {
+                prefs.edit()
+                    .putBoolean("user_name_manual", false)
+                    .putString("user_name", "Explorer")
+                    .putBoolean("migration_v0_7_name", true)
+                    .apply()
+                _userName.value = "Explorer"
+            } else {
+                prefs.edit().putBoolean("migration_v0_7_name", true).apply()
+            }
+        }
     }
 
     // Setters
@@ -374,6 +391,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
      * Called once when the user picks an account from the chooser.
      */
     private val _isConnectingAccount = MutableStateFlow(false)
+    val isConnectingAccount: StateFlow<Boolean> = _isConnectingAccount.asStateFlow()
 
     fun connectAndSyncGoogleAccount(email: String) {
         // Prevent re-entry while a connect is in flight — fixes the "account

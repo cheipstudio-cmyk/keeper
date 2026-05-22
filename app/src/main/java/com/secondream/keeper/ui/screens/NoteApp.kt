@@ -16,7 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -325,17 +325,17 @@ fun NoteApp(viewModel: NoteViewModel) {
                                 onClick = { isCreatingNewNote = true },
                                 containerColor = Color(0xFFFFCA28),
                                 contentColor = Color(0xFF1A1A1A),
-                                shape = CircleShape,
+                                shape = RoundedCornerShape(20.dp),
                                 elevation = FloatingActionButtonDefaults.elevation(
-                                    defaultElevation = 6.dp,
-                                    pressedElevation = 12.dp
+                                    defaultElevation = 8.dp,
+                                    pressedElevation = 14.dp
                                 ),
-                                modifier = Modifier.size(64.dp)
+                                modifier = Modifier.size(68.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Add,
+                                    imageVector = Icons.Rounded.Add,
                                     contentDescription = stringResource(R.string.take_note),
-                                    modifier = Modifier.size(30.dp)
+                                    modifier = Modifier.size(34.dp)
                                 )
                             }
                         },

@@ -3,6 +3,7 @@ package com.secondream.keeper.ui.screens
 import android.accounts.AccountManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -99,55 +102,50 @@ fun OnboardingDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 28.dp, vertical = 16.dp),
+                        .padding(horizontal = 32.dp, vertical = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Hero icon
-                    Box(
+                    // Hero: real app icon, large
+                    Image(
+                        painter = painterResource(id = com.secondream.keeper.R.mipmap.ic_launcher_round),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(120.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFFFCA28)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.NoteAlt,
-                            contentDescription = null,
-                            tint = Color(0xFF1A1A1A),
-                            modifier = Modifier.size(52.dp)
-                        )
-                    }
+                    )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
 
                     Text(
                         text = stringResource(R.string.onboarding_welcome_title),
-                        fontSize = 24.sp,
+                        fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onBackground,
+                        letterSpacing = (-0.5).sp
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
                         text = stringResource(R.string.onboarding_intro_long),
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
                         textAlign = TextAlign.Center,
-                        lineHeight = 19.sp
+                        lineHeight = 21.sp
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     // Feature bullets
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         FeatureBullet(
                             icon = Icons.Rounded.CloudSync,
@@ -166,29 +164,29 @@ fun OnboardingDialog(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
                         text = stringResource(R.string.onboarding_drive_explain),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                         textAlign = TextAlign.Center,
-                        lineHeight = 16.sp
+                        lineHeight = 17.sp
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(22.dp))
 
                     // Primary action
                     Button(
                         onClick = { triggerGooglePicker() },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
+                            .height(56.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFFFCA28),
                             contentColor = Color(0xFF1A1A1A)
                         ),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.onboarding_connect_drive),
@@ -197,7 +195,8 @@ fun OnboardingDialog(
                         )
                     }
 
-                    // Secondary (skip)
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     TextButton(
                         onClick = { viewModel.completeOnboarding() },
                         modifier = Modifier.fillMaxWidth()
@@ -223,32 +222,32 @@ private fun FeatureBullet(
     Row(verticalAlignment = Alignment.Top) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFFFCA28).copy(alpha = 0.18f)),
+                .background(Color(0xFFFFCA28).copy(alpha = 0.20f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = Color(0xFFFFCA28),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.padding(top = 2.dp)) {
             Text(
                 text = title,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = body,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
-                lineHeight = 15.sp
+                lineHeight = 17.sp
             )
         }
     }

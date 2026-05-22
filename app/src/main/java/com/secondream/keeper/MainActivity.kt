@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.secondream.keeper.ui.screens.ConnectingDialog
 import com.secondream.keeper.ui.screens.NoteApp
 import com.secondream.keeper.ui.screens.OnboardingDialog
 import com.secondream.keeper.ui.theme.MyApplicationTheme
@@ -64,6 +65,8 @@ class MainActivity : ComponentActivity() {
                     if (!onboardingCompleted) {
                         OnboardingDialog(viewModel = viewModel)
                     }
+                    // Loading overlay while Drive auth + initial import runs
+                    ConnectingDialog(viewModel = viewModel)
                 }
             }
         }
