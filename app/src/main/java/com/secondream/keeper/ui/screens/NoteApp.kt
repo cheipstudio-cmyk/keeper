@@ -729,6 +729,7 @@ fun NoteApp(viewModel: NoteViewModel) {
             note = selectedNoteForEdit,
             viewModel = viewModel,
             initialLaunchType = if (isCreatingNewNote) initialLaunchType else null,
+            isActive = isCreatingNewNote || selectedNoteForEdit != null,
             onDismiss = {
                 selectedNoteForEdit = null
                 isCreatingNewNote = false

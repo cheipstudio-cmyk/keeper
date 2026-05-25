@@ -70,6 +70,7 @@ fun NoteDetailView(
     note: Note?, // Null means "Create New Note"
     viewModel: NoteViewModel,
     initialLaunchType: String? = null,
+    isActive: Boolean = true, // false during exit animation
     onDismiss: () -> Unit
 ) {
     // Current draft notes fields. All scoped to note?.id so that if the
@@ -894,7 +895,14 @@ fun NoteDetailView(
                         // Request focus on first entry into edit mode. A tiny
                         // delay lets the TextField fully attach to the layout
                         // tree before we ask the IME to open.
+                        //
+                        // GUARD: skip the request if the dialog is in the
+                        // middle of dismissing (isActive=false). During the
+                        // exit animation the composable is still on screen
+                        // and remember(note?.id=null) resets state to "blank
+                        // edit mode", which would otherwise flash the IME.
                         LaunchedEffect(Unit) {
+                            if (!isActive) return@LaunchedEffect
                             try {
                                 kotlinx.coroutines.delay(80)
                                 contentFocusRequester.requestFocus()
