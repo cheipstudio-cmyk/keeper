@@ -811,9 +811,11 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                         if (importedCount > 0) {
-                            _syncMessage.value = "Recuperate $importedCount note da Drive"
+                            _syncMessage.value = getApplication<Application>()
+                                .getString(com.secondream.keeper.R.string.imported_notes_message, importedCount)
                         } else {
-                            _syncMessage.value = "Connesso. Nessuna nota su Drive."
+                            _syncMessage.value = getApplication<Application>()
+                                .getString(com.secondream.keeper.R.string.connected_no_notes)
                         }
                     } else if (importOutcome is DriveSyncRepository.ImportOutcome.NeedsUserAction) {
                         _pendingAuthIntent.value = importOutcome.intent

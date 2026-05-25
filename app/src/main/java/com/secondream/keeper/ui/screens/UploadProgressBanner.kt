@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondream.keeper.viewmodel.NoteViewModel
 import kotlinx.coroutines.flow.map
+import androidx.compose.ui.res.stringResource
+import com.secondream.keeper.R
 
 /**
  * Floating Drive-sync banner shown above the FAB across all screens.
@@ -176,7 +178,7 @@ fun OfflineBanner(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Senza connessione. La sincronizzazione riprenderà appena torni online.",
+                    text = stringResource(R.string.offline_banner_message),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
                     fontWeight = FontWeight.Medium,

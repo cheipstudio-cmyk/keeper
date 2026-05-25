@@ -14,8 +14,8 @@ android {
     applicationId = "com.secondream.keeper"
     minSdk = 24
     targetSdk = 36
-    versionCode = 35
-    versionName = "0.9.12"
+    versionCode = 36
+    versionName = "0.9.13"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

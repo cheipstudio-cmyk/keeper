@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.secondream.keeper.viewmodel.NoteViewModel
+import androidx.compose.ui.res.stringResource
+import com.secondream.keeper.R
 
 /**
  * Full-screen lock overlay shown when the app is launched / resumed while
@@ -131,7 +133,7 @@ fun LockScreen(viewModel: NoteViewModel) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Sblocca con impronta o codice del telefono per accedere alle note",
+                text = stringResource(R.string.lock_screen_message),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                 modifier = Modifier.padding(horizontal = 16.dp),

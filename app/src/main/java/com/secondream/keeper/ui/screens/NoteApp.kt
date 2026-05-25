@@ -172,7 +172,7 @@ fun NoteApp(viewModel: NoteViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Crea etichetta",
+                            contentDescription = stringResource(R.string.create_label_button),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
@@ -215,12 +215,12 @@ fun NoteApp(viewModel: NoteViewModel) {
                     var newLabelText by remember { mutableStateOf("") }
                     AlertDialog(
                         onDismissRequest = { showCreateLabelDialog = false },
-                        title = { Text("Nuova etichetta", fontWeight = FontWeight.Bold) },
+                        title = { Text(stringResource(R.string.new_label_title), fontWeight = FontWeight.Bold) },
                         text = {
                             OutlinedTextField(
                                 value = newLabelText,
                                 onValueChange = { newLabelText = it },
-                                placeholder = { Text("Nome etichetta") },
+                                placeholder = { Text(stringResource(R.string.label_name_placeholder)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -530,10 +530,10 @@ fun NoteApp(viewModel: NoteViewModel) {
                                 if (showEmptyTrashConfirm) {
                                     AlertDialog(
                                         onDismissRequest = { showEmptyTrashConfirm = false },
-                                        title = { Text("Svuotare il cestino?", fontWeight = FontWeight.Bold) },
+                                        title = { Text(stringResource(R.string.empty_trash_title), fontWeight = FontWeight.Bold) },
                                         text = {
                                             Text(
-                                                "Tutte le ${filteredNotes.size} note nel cestino verranno eliminate definitivamente dal telefono e dal tuo Drive. Questa azione è irreversibile."
+                                                stringResource(R.string.empty_trash_confirm_message, filteredNotes.size)
                                             )
                                         },
                                         confirmButton = {
@@ -1057,27 +1057,27 @@ fun EmptyStateView(screen: NavigationScreen) {
         is NavigationScreen.Notes -> Triple(
             Icons.Outlined.Lightbulb,
             stringResource(R.string.empty_notes),
-            "Tocca + per crearne una"
+            stringResource(R.string.empty_notes_hint)
         )
         is NavigationScreen.Reminders -> Triple(
             Icons.Outlined.Checklist,
             stringResource(R.string.empty_reminders),
-            "Le tue checklist appariranno qui"
+            stringResource(R.string.empty_reminders_hint)
         )
         is NavigationScreen.Archive -> Triple(
             Icons.Outlined.Archive,
             stringResource(R.string.empty_archive),
-            "Le note archiviate verranno raccolte qui"
+            stringResource(R.string.empty_archive_hint)
         )
         is NavigationScreen.Trash -> Triple(
             Icons.Outlined.Delete,
             stringResource(R.string.empty_trash),
-            "Le note eliminate restano per 30 giorni"
+            stringResource(R.string.empty_trash_hint)
         )
         is NavigationScreen.Label -> Triple(
             Icons.Outlined.Label,
             stringResource(R.string.empty_label),
-            "Aggiungi questa etichetta alle tue note"
+            stringResource(R.string.empty_label_hint)
         )
         is NavigationScreen.Settings -> Triple(
             Icons.Outlined.Settings,

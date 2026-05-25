@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.secondream.keeper.R
 
 /**
  * Bottom-sheet voice recorder with the same visual language as
@@ -80,18 +82,18 @@ fun VoiceRecorderSheet(
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Dettatura vocale",
+                        text = stringResource(R.string.voice_dictation_title),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = if (isRecording)
-                            "Parla chiaramente, registrazione in corso"
+                            stringResource(R.string.voice_recording_in_progress)
                         else if (dictationText.isBlank())
-                            "Premi il microfono per iniziare"
+                            stringResource(R.string.voice_press_to_start)
                         else
-                            "Modifica il testo se necessario, poi conferma",
+                            stringResource(R.string.voice_edit_and_confirm),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -173,7 +175,7 @@ fun VoiceRecorderSheet(
                     BasicEditField(
                         value = editableText,
                         onValueChange = { editableText = it },
-                        placeholder = "Il testo dettato apparirà qui…"
+                        placeholder = stringResource(R.string.voice_dictated_text_placeholder)
                     )
                 }
             }
@@ -204,7 +206,7 @@ fun VoiceRecorderSheet(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isRecording) "Stop" else "Registra",
+                        text = if (isRecording) stringResource(R.string.voice_stop_button) else stringResource(R.string.voice_record_button),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )

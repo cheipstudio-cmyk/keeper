@@ -12,6 +12,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.secondream.keeper.viewmodel.NoteViewModel
+import androidx.compose.ui.res.stringResource
+import com.secondream.keeper.R
 
 @Composable
 fun AccountSwitchDialog(viewModel: NoteViewModel) {
@@ -42,19 +44,19 @@ fun AccountSwitchDialog(viewModel: NoteViewModel) {
                 LabelRow(label = "Nuovo account", value = pending.newEmail)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Cosa farò, in ordine:",
+                    text = stringResource(R.string.account_switch_intro),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                BulletStep("1.", "Sincronizzo tutte le note locali sul Drive di ${pending.previousEmail}")
-                BulletStep("2.", "Cancello le note dal telefono")
-                BulletStep("3.", "Mi connetto a ${pending.newEmail}")
-                BulletStep("4.", "Importo le note dal Drive di ${pending.newEmail}")
+                BulletStep("1.", stringResource(R.string.account_switch_step1, pending.previousEmail))
+                BulletStep("2.", stringResource(R.string.account_switch_step2))
+                BulletStep("3.", stringResource(R.string.account_switch_step3, pending.newEmail))
+                BulletStep("4.", stringResource(R.string.account_switch_step4, pending.newEmail))
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Nessuna nota viene persa: tutto resta sul Drive di ciascun account.",
+                    text = stringResource(R.string.account_switch_safe_note),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     lineHeight = 17.sp
@@ -70,7 +72,7 @@ fun AccountSwitchDialog(viewModel: NoteViewModel) {
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Procedi", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.account_switch_proceed), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

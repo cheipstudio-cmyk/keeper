@@ -72,26 +72,31 @@ fun NoteDetailView(
     initialLaunchType: String? = null,
     onDismiss: () -> Unit
 ) {
-    // Current draft notes fields
-    var title by remember { mutableStateOf(note?.title ?: "") }
-    var content by remember { mutableStateOf(note?.content ?: "") }
-    var colorHex by remember { mutableStateOf(note?.colorHex ?: viewModel.defaultNoteColor.value) }
-    var isPinned by remember { mutableStateOf(note?.isPinned ?: false) }
-    var labelsCSV by remember { mutableStateOf(note?.labels ?: "") }
+    // Current draft notes fields. All scoped to note?.id so that if the
+    // active note is swapped (e.g. user taps a different note from the
+    // widget while this dialog is still on top), the editor re-initializes
+    // for the new note instead of carrying over the previous note's edits
+    // — which previously caused the new note to be overwritten with the
+    // old note's content on save (apparent duplication bug).
+    var title by remember(note?.id) { mutableStateOf(note?.title ?: "") }
+    var content by remember(note?.id) { mutableStateOf(note?.content ?: "") }
+    var colorHex by remember(note?.id) { mutableStateOf(note?.colorHex ?: viewModel.defaultNoteColor.value) }
+    var isPinned by remember(note?.id) { mutableStateOf(note?.isPinned ?: false) }
+    var labelsCSV by remember(note?.id) { mutableStateOf(note?.labels ?: "") }
 
     // Checklists items
-    var checklistItems by remember {
+    var checklistItems by remember(note?.id) {
         mutableStateOf(note?.getChecklist() ?: emptyList())
     }
-    var isChecklistActive by remember {
+    var isChecklistActive by remember(note?.id) {
         mutableStateOf(note?.getChecklist()?.isNotEmpty() == true)
     }
-    var newChecklistItemText by remember { mutableStateOf("") }
+    var newChecklistItemText by remember(note?.id) { mutableStateOf("") }
 
     // Attachments lists
     val tempAttachments by viewModel.tempAttachments.collectAsState()
     val uploadingTasks by viewModel.uploadingTasks.collectAsState()
-    var savedAttachments by remember {
+    var savedAttachments by remember(note?.id) {
         mutableStateOf(note?.getAttachments() ?: emptyList())
     }
 
@@ -636,7 +641,7 @@ fun NoteDetailView(
                             if (isTrashedNote)
                                 "La nota verrà rimossa dal telefono e dal Drive. Questa azione è irreversibile."
                             else
-                                "La nota verrà spostata nel cestino. Puoi recuperarla finché non svuoti il cestino."
+                                stringResource(R.string.trash_confirm_message)
                         )
                     },
                     confirmButton = {
@@ -1149,7 +1154,7 @@ fun NoteDetailView(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Crea etichetta", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.create_label_button), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             } else {
                                 FlowRow(
@@ -1244,12 +1249,12 @@ fun NoteDetailView(
                             var newTagName by remember { mutableStateOf("") }
                             AlertDialog(
                                 onDismissRequest = { showCreateTagDialog = false },
-                                title = { Text("Nuova etichetta", fontWeight = FontWeight.Bold) },
+                                title = { Text(stringResource(R.string.new_label_title), fontWeight = FontWeight.Bold) },
                                 text = {
                                     OutlinedTextField(
                                         value = newTagName,
                                         onValueChange = { newTagName = it },
-                                        placeholder = { Text("Nome etichetta") },
+                                        placeholder = { Text(stringResource(R.string.label_name_placeholder)) },
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(12.dp)

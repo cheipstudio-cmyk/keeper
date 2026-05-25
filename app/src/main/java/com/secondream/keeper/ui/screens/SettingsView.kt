@@ -569,7 +569,7 @@ fun SettingsView(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Caricamento automatico su Drive",
+                                        text = stringResource(R.string.auto_upload_drive_label),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onBackground
@@ -601,7 +601,7 @@ fun SettingsView(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Connetti il tuo account Google qui sopra per abilitare il backup sul cloud.",
+                            text = stringResource(R.string.settings_connect_account_hint),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.weight(1f)
@@ -656,7 +656,7 @@ fun SettingsView(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "Impronta o codice del telefono ogni volta che apri Keeper",
+                            text = stringResource(R.string.settings_app_lock_subtitle),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                             lineHeight = 15.sp
@@ -677,7 +677,7 @@ fun SettingsView(
                                 } else {
                                     android.widget.Toast.makeText(
                                         context,
-                                        "Imposta prima un PIN, codice o impronta sul telefono",
+                                        context.getString(R.string.settings_app_lock_toast),
                                         android.widget.Toast.LENGTH_LONG
                                     ).show()
                                 }
