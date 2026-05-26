@@ -96,7 +96,13 @@ class MainActivity : FragmentActivity() {
                 contract = ActivityResultContracts.StartActivityForResult()
             ) { result ->
                 viewModel.clearPendingAuthIntent()
-                val email = viewModel.googleEmail.value
+                // Resume connecting with the email that was in-flight when
+                // the consent intent was issued. Falling back to googleEmail
+                // covers the (rare) case where the consent is re-prompted
+                // after we're already connected to an account.
+                val email = viewModel.pendingConnectEmail.value.ifBlank {
+                    viewModel.googleEmail.value
+                }
                 if (result.resultCode == android.app.Activity.RESULT_OK && email.isNotBlank()) {
                     viewModel.connectAndSyncGoogleAccount(email)
                 }

@@ -156,4 +156,5 @@
     <string name="account_switch_safe_note">Aucune note n est perdue : tout reste sur le Drive de chaque compte.</string>
     <string name="account_switch_proceed">Continuer</string>
     <string name="empty_trash_title">Vider la corbeille ?</string>
+    <string name="onboarding_tagline">Vos notes rapides, synchronisées et sécurisées</string>
 </resources>

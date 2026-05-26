@@ -156,4 +156,5 @@
     <string name="account_switch_safe_note">Keine Notiz geht verloren. Alles bleibt im Drive jedes Kontos.</string>
     <string name="account_switch_proceed">Fortfahren</string>
     <string name="empty_trash_title">Papierkorb leeren?</string>
+    <string name="onboarding_tagline">Deine schnellen Notizen, synchronisiert und sicher</string>
 </resources>

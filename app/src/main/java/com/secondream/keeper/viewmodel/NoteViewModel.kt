@@ -445,6 +445,12 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingAuthIntent = MutableStateFlow<Intent?>(null)
     val pendingAuthIntent = _pendingAuthIntent.asStateFlow()
 
+    // Email being connected, kept across the OAuth consent dance so the auth
+    // result callback can resume the connect with the right account (the
+    // permanent _googleEmail isn't set until the connect actually succeeds).
+    private val _pendingConnectEmail = MutableStateFlow("")
+    val pendingConnectEmail = _pendingConnectEmail.asStateFlow()
+
     // Onboarding: shown only on first launch (until user dismisses or connects)
     private val _onboardingCompleted = MutableStateFlow(prefs.getBoolean("onboarding_completed", false))
     val onboardingCompleted = _onboardingCompleted.asStateFlow()
@@ -757,6 +763,12 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun doConnectAccount(email: String) {
         _isConnectingAccount.value = true
+        // Remember the in-flight email so the OAuth consent retry path can
+        // pick it up. Without this, if ensureRootFolder returns NeedsUserAction
+        // (first-time consent on a fresh install) the auth callback would
+        // read _googleEmail.value (still empty) and silently no-op, forcing
+        // the user to manually click "Connect Drive" a second time.
+        _pendingConnectEmail.value = email
         viewModelScope.launch {
             _isSyncingNotes.value = true
             _syncMessage.value = "Connessione a Google Drive..."
@@ -838,6 +850,11 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
             delay(700)
             _isSyncingNotes.value = false
             _isConnectingAccount.value = false
+            // Clear only if the auth dance is complete (no pending intent).
+            // Otherwise we'd lose the email needed for the consent retry.
+            if (_pendingAuthIntent.value == null) {
+                _pendingConnectEmail.value = ""
+            }
         }
     }
 

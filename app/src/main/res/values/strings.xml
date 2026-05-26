@@ -162,4 +162,5 @@
     <string name="account_switch_safe_note">No note is lost. Everything stays on each account\'s Drive.</string>
     <string name="account_switch_proceed">Proceed</string>
     <string name="empty_trash_title">Empty the trash?</string>
+    <string name="onboarding_tagline">Your fast notes, synced and secure</string>
 </resources>
